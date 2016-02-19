@@ -1,0 +1,12 @@
+{
+  "className":  "ApplicationGreenGuac2",
+  "name":       "GreenGuac2",
+  "mime":       null,
+  "icon":       "categories/applications-system.png",
+  "preload":    [
+    {"src": "main.js", "type": "javascript"}
+  ]
+}
+
+
+
