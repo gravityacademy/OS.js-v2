@@ -36,7 +36,7 @@
 
   function ApplicationGreenGuac2(args, metadata) {
     Application.apply(this, ['ApplicationGreenGuac2', args, metadata, {
-      src: '//198.199.101.183:8080/guacamole',
+      src: '//107.170.230.62:8080/guacamole',
       title: metadata.name,
       icon: metadata.icon,
       width: 640,
