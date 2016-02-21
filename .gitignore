@@ -8,6 +8,14 @@ twistd.*
 .vagrant/*
 *.pyc
 
+.idea
+.gradle
+gradle
+build.gradle
+gradlew
+OS.js-v2.iml
+settings.gradle
+
 .nightly
 .standalone
 .debian
