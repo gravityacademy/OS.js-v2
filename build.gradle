@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '1.2.2'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'http://oss.sonatype.org/content/repositories/snapshots/'
+    }
+}
+
+sourceCompatibility = '1.8'
+mainClassName = 'io.vertx.core.Launcher'
+version = '3.2.1'
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'http://oss.sonatype.org/content/repositories/snapshots/'
+    }
+}
+
+dependencies {
+    compile 'io.vertx:vertx-core:3.2.1'
+    compile 'io.vertx:vertx-lang-js:3.2.1'
+    compile 'io.vertx:vertx-lang-groovy:3.2.1'
+    compile 'io.vertx:vertx-web:3.2.1'
+    compile 'io.vertx:vertx-auth-common:3.2.1'
+    compile 'io.vertx:vertx-auth-shiro:3.2.1'
+    compile 'io.vertx:vertx-auth-jwt:3.2.1'
+    compile 'org.pac4j:pac4j-oauth:1.7.1'
+}
+
+processResources {
+    from 'src/server/vertx'
+}
+
+shadowJar {
+    classifier = 'fat'
+    manifest {
+        attributes 'Main-Verticle': 'server.js'
+    }
+    mergeServiceFiles {
+        include 'META-INF/services/io.vertx.core.spi.VerticleFactory'
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.8'
+}

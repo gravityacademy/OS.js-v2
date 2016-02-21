@@ -10,11 +10,7 @@ twistd.*
 
 .idea
 .gradle
-gradle
-build.gradle
-gradlew
-OS.js-v2.iml
-settings.gradle
+.vertx
 
 .nightly
 .standalone
