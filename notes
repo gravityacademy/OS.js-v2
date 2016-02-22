@@ -1,0 +1,48 @@
+Request Method:POST
+http://localhost:8000/API/login
+{"username":"demo","password":"demo"}
+
+  blacklistedPackages: [],
+  userData: {id: 0, username: "demo", name: "Demo User", groups: ["admin"]},
+  userSettings: {}
+
+
+Request Method:POST
+http://localhost:8000/FS/exists
+{path: "home:///.packages/packages.json"}
+
+  result: false
+
+Request Method:POST
+http://localhost:8000/FS/scandir
+{path: "home:///"}
+
+  result:[{
+    ctime: "2016-02-22T02:46:09.000Z",
+    filename: "hello.txt",
+    mime: "text/plain",
+    mtime: "2016-02-22T00:43:20.000Z",
+    path: "home:///hello.txt",
+    size: 16,
+    type: "file"
+    }]
+
+
+Request Method:GET
+=-==-=-=-=-=-=-=-=--=
+http://localhost:8000/client/dialogs.html
+http://localhost:8000/packages/default/CoreWM/scheme.html
+
+
+
+
+
+_Handler.prototype.__callXHR = function(url, args, options, cbSuccess, cbError) {
+    // API/VFS method calls
+};
+_Handler.prototype.__callPOST = function(form, options, cbSuccess, cbError) {
+  // VFS File POST (upload)
+};
+_Handler.prototype.__callGET = function(args, options, cbSuccess, cbError) {
+  // VFS File GET (download/read)
+};

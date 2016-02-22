@@ -35,6 +35,7 @@
   OSjs.Core     = OSjs.Core     || {};
 
   var _handlerInstance;
+  var VERTX = true;
 
   /////////////////////////////////////////////////////////////////////////////
   // DEFAULT HANDLING CODE
@@ -401,30 +402,57 @@
   _Handler.prototype.__callXHR = function(url, args, options, cbSuccess, cbError) {
     var self = this;
 
+    console.log(' -=-=-=-=-=-=- __callXHR');
+
     cbError = cbError || function() {
       console.warn('Handler::__callXHR()', 'error', arguments);
     };
 
-    var data = {
-      url: url,
-      method: 'POST',
-      json: true,
-      body: args,
-      onsuccess: function(/*response, request, url*/) {
-        cbSuccess.apply(self, arguments);
-      },
-      onerror: function(/*error, response, request, url*/) {
-        cbError.apply(self, arguments);
+
+    if (VERTX) {
+
+      if (window.eb) afterCheck();
+      else {
+        window.eb = new EventBus("/eventbus");
+        eb.onopen = afterCheck;
       }
-    };
 
-    if ( options ) {
-      Object.keys(options).forEach(function(key) {
-        data[key] = options[key];
-      });
+      function afterCheck() {
+        window.eb.send('OSjsCallXHR', {url: url, args: args, options: options}, function (err, res) {
+          if (err) cbError();
+          else {
+            var response = {};
+            response.result = res.body;
+            console.log(JSON.stringify(response));
+            cbSuccess(response);
+          }
+        });
+      }
+
+    } else {
+
+      var data = {
+        url: url,
+        method: 'POST',
+        json: true,
+        body: args,
+        onsuccess: function (/*response, request, url */) {
+          cbSuccess.apply(self, arguments);
+        },
+        onerror: function (/*error, response, request, url */) {
+          cbError.apply(self, arguments);
+        }
+      };
+
+      if (options) {
+        Object.keys(options).forEach(function (key) {
+          data[key] = options[key];
+        });
+      }
+
+      Utils.ajax(data);
+
     }
-
-    Utils.ajax(data);
 
     return true;
   };
@@ -471,6 +499,9 @@
    * @see  _Handler::callAPI()
    */
   _Handler.prototype.__callPOST = function(form, options, cbSuccess, cbError) {
+
+    console.log(' -=-=-=-=-=-=-=- __callPOST');
+
     var onprogress = options.onprogress || function() {};
 
     cbError = cbError || function() {
@@ -506,6 +537,12 @@
    * @see  _Handler::callAPI()
    */
   _Handler.prototype.__callGET = function(args, options, cbSuccess, cbError) {
+
+    console.log(' -=-=-=-=-=-=-=- __callGET');
+
+    console.log(args);
+    console.log(options);
+
     var self = this;
     var onprogress = args.onprogress || function() {};
 
@@ -513,28 +550,44 @@
       console.warn('Handler::__callGET()', 'error', arguments);
     };
 
-    Utils.ajax({
-      url: args.url || OSjs.VFS.Transports.Internal.path(args.path),
-      method: args.method || 'GET',
-      responseType: 'arraybuffer',
-      onprogress: function(ev) {
-        if ( ev.lengthComputable ) {
-          onprogress(ev, ev.loaded / ev.total);
-        } else {
-          onprogress(ev, -1);
+
+    if (VERTX) {
+
+      window.eb.send('OSjsCallGET', {args: args, options: options}, function (err, res) {
+        if (err) cbError(err);
+        else {
+          var result = res.body;
+          console.log(JSON.stringify(result));
+          cbSuccess({error: false, result: result});
         }
-      },
-      onsuccess: function(response, xhr) {
-        if ( !xhr || xhr.status === 404 || xhr.status === 500 ) {
-          cbSuccess({error: xhr.statusText || response, result: null});
-          return;
+      });
+      
+    } else {
+
+      Utils.ajax({
+        url: args.url || OSjs.VFS.Transports.Internal.path(args.path),
+        method: args.method || 'GET',
+        responseType: 'arraybuffer',
+        onprogress: function (ev) {
+          if (ev.lengthComputable) {
+            onprogress(ev, ev.loaded / ev.total);
+          } else {
+            onprogress(ev, -1);
+          }
+        },
+        onsuccess: function (response, xhr) {
+          if (!xhr || xhr.status === 404 || xhr.status === 500) {
+            cbSuccess({error: xhr.statusText || response, result: null});
+            return;
+          }
+          cbSuccess({error: false, result: response});
+        },
+        onerror: function () {
+          cbError.apply(self, arguments);
         }
-        cbSuccess({error: false, result: response});
-      },
-      onerror: function() {
-        cbError.apply(self, arguments);
-      }
-    });
+      });
+      
+    }
 
     return true;
   };
