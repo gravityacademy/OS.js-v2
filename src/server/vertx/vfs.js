@@ -13,7 +13,7 @@
  * write
  * read
  *
- * File permissions
+ * File permissions, privl
  */
 
 module.exports = (function(){
@@ -60,8 +60,20 @@ module.exports = (function(){
 
     if ( path != '/' ) {
       var ppcs = path.split('/');
-      if ( ppcs[0] && ppcs[1] ) upOne = protocol + '/' + ppcs[ppcs.length - 2];
-      else if ( ppcs[1] ) upOne = protocol + '/';
+
+      if ( ppcs.length === 2 ) {
+
+        upOne = protocol + '/';
+
+      } else if ( ppcs.length > 2 ) {
+
+        upOne = protocol;
+
+        for (var i = 1; i < ppcs.length-1; i++) {
+
+          upOne += '/' + ppcs[i];
+        }
+      }
     }
 
     if (DEBUG) {

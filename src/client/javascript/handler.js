@@ -411,13 +411,7 @@
 
     if (VERTX) {
 
-      if (window.eb) afterCheck();
-      else {
-        window.eb = new EventBus("/eventbus");
-        eb.onopen = afterCheck;
-      }
-
-      function afterCheck() {
+      var afterCheck = function() {
         window.eb.send('OSjsCallXHR', {url: url, args: args, options: options}, function (err, res) {
           if (err) cbError();
           else {
@@ -427,6 +421,12 @@
             cbSuccess(response);
           }
         });
+      };
+
+      if (window.eb) afterCheck();
+      else {
+        window.eb = new EventBus("/eventbus");
+        eb.onopen = afterCheck;
       }
 
     } else {
