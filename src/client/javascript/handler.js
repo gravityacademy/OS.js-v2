@@ -48,7 +48,7 @@
    *
    * You can implement your own.
    *
-   * NEVER CONSTRUCT YOUR OWN INTANCE! To get one use:
+   * NEVER CONSTRUCT YOUR OWN INSTANCE! To get one use:
    * OSjs.Core.getHandler();
    *
    * @api   OSjs.Core._Handler
@@ -508,23 +508,39 @@
       console.warn('Handler::__callPOST()', 'error', arguments);
     };
 
-    OSjs.Utils.ajax({
-      url: OSjs.VFS.Transports.Internal.path(),
-      method: 'POST',
-      body: form,
-      onsuccess: function(result) {
-        cbSuccess(false, result);
-      },
-      onerror: function(result) {
-        cbError('error', null, result);
-      },
-      onprogress: function(evt) {
-        onprogress(evt);
-      },
-      oncanceled: function(evt) {
-        cbError('canceled', null, evt);
-      }
-    });
+
+    if (VERTX) {
+
+      window.eb.send('OSjsCallPOST', {args: args, options: options}, function (err, res) {
+        if (err) cbError(err);
+        else {
+          var result = res.body;
+          console.log(JSON.stringify(result));
+          cbSuccess({error: false, result: result});
+        }
+      });
+
+    } else {
+
+      OSjs.Utils.ajax({
+        url: OSjs.VFS.Transports.Internal.path(),
+        method: 'POST',
+        body: form,
+        onsuccess: function (result) {
+          cbSuccess(false, result);
+        },
+        onerror: function (result) {
+          cbError('error', null, result);
+        },
+        onprogress: function (evt) {
+          onprogress(evt);
+        },
+        oncanceled: function (evt) {
+          cbError('canceled', null, evt);
+        }
+      });
+
+    }
 
     return true;
   };

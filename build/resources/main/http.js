@@ -1,4 +1,3 @@
-var Buffer = require("vertx-js/buffer");
 var Router = require("vertx-web-js/router");
 var SockJSHandler = require("vertx-web-js/sock_js_handler");
 var StaticHandler = require("vertx-web-js/static_handler");
@@ -15,14 +14,13 @@ var FormLoginHandler = require("vertx-web-js/form_login_handler");
 var User = require("vertx-auth-common-js/user");
 var router = Router.router(vertx);
 
-global.eb = vertx.eventBus();
-global.fs = vertx.fileSystem();
-global.DEBUG = false;
+var eb = vertx.eventBus();
+var fs = vertx.fileSystem();
+global.DEBUG = true;
 global.OSjs = {
   API: require("./api.js"),
   VFS: require("./vfs.js")
 };
-
 
 var options = {
   "outboundPermitteds" : [{ "setAddressRegex" : "/^OSjs/" }],
@@ -30,6 +28,14 @@ var options = {
 
 
 router.route("/eventbus/*").handler(SockJSHandler.create(vertx).bridge(options).handle);
+
+router.route('GET', "/FS/get/*").handler(function (rc) {
+  var path = rc.request().path().replace('/FS/get/', '');
+  var paths = OSjs.VFS.getRealPath(path);
+  if (DEBUG) console.log('http FS get ' + paths.path);
+  rc.response().sendFile(paths.full);
+});
+
 router.route().handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("dist-dev").handle);
 
 vertx.createHttpServer().requestHandler(router.accept).listen(8000);
@@ -39,61 +45,49 @@ eb.consumer('OSjsCallXHR', function(message) {
 
   var msg = message.body();     //  {url:url, args:args, options:options}
   var pair = msg.url.substring(1).split('/');
-
+  var call = pair[0];
+  var method = pair[1];
   if (DEBUG) {
-    console.log(pair[0]);
-    console.log(pair[1]);
-    console.log(JSON.stringify(msg.args));
+    console.log( 'calling: ' + call + ' method: ' + method);
+    //console.log(JSON.stringify(msg.args));
   }
-
-  switch (pair[0]) {
-    case 'API': _api(pair[1], msg.args, message); break;
-    case 'FS' : _fs(pair[1], msg.args, message); break;
+  switch (call) {
+    case 'API': OSjs.API[method](msg.args, message); break;
+    case 'FS' : OSjs.VFS[method](msg.args, message); break;
   }
-
 });
 
-function _api(method, args, message){
-  switch (method) {
-    case 'login': OSjs.API.login(args, message); break
-  }
-}
+eb.consumer('OSjsCallPOST', function(message) {
+  console.log('OSjsCallPOST');
 
-function _fs(method, args, message){
-  switch (method) {
-    case 'exists': OSjs.VFS.exists(args, message); break;
-    case 'scandir': OSjs.VFS.scandir(args, message); break;
-  }
-}
+  var mes = message.body();
+  var paths = OSjs.VFS.getRealPath(mes.args.path);
 
-
-
-eb.consumer('OSjsCallPOST', function(mes) {
-
+  fs.writeFile(paths.full, function(result, error){
+    if(error) message.reply(false);
+    else message.reply(true);
+  });
 });
 
 eb.consumer('OSjsCallGET', function(message) {
-
   console.log('OSjsCallGET');
 
   var mes = message.body();
   var paths = OSjs.VFS.getRealPath(mes.args.path);
 
   fs.readFile(paths.full, function(result, error){
-
   	if (error == null) {
-  	  result = result.toString("UTF-8");
-      if (DEBUG) console.log(result);
-      message.reply(result);
+      if (DEBUG) console.log('callGet ' + paths.path);
+      message.reply(result.toString("UTF-8"));
   	} else {
       console.log('fs error');
-      console.log(JSON.stringify(err));
+      console.log(JSON.stringify(error));
   	}
-
   })
-
 });
 
-console.log('***');
-console.log('*** OS.js vertx is listening on port ' + config.port);
-console.log('***');
+setTimeout(function(){
+  console.log('***');
+  console.log('*** OS.js vertx is listening on port ' + config.port);
+  console.log('***');
+}, 300);

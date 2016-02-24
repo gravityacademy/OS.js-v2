@@ -1,4 +1,4 @@
-Request Method:POST
+POST
 http://localhost:8000/API/login
 {"username":"demo","password":"demo"}
 
@@ -7,13 +7,13 @@ http://localhost:8000/API/login
   userSettings: {}
 
 
-Request Method:POST
+POST
 http://localhost:8000/FS/exists
 {path: "home:///.packages/packages.json"}
 
   result: false
 
-Request Method:POST
+POST
 http://localhost:8000/FS/scandir
 {path: "home:///"}
 
@@ -27,14 +27,10 @@ http://localhost:8000/FS/scandir
     type: "file"
     }]
 
+FS/write
+{"path":"home:///hello (copy).txt","data":"data:text/plain;base64,aGVsbG8gdGVzdCBmaWxlCndyaXRlIHRoaXMgZmlsZQ=="}
 
-Request Method:GET
-=-==-=-=-=-=-=-=-=--=
-http://localhost:8000/client/dialogs.html
-http://localhost:8000/packages/default/CoreWM/scheme.html
-
-
-
+  {"result":true,"error":false}
 
 
 _Handler.prototype.__callXHR = function(url, args, options, cbSuccess, cbError) {
