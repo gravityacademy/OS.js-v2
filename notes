@@ -1,3 +1,14 @@
+port: null,
+dirname: '/home/jesus/OS.js-v2/src/server/node',
+root: '/home/jesus/OS.js-v2/',
+dist: 'dist-dev',
+logging: true,
+nw: false,
+settings: '/home/jesus/OS.js-v2/src/server/settings.json',
+repodir: '/home/jesus/OS.js-v2/src/packages',
+distdir: '/home/jesus/OS.js-v2/dist-dev'
+
+
 POST
 http://localhost:8000/API/login
 {"username":"demo","password":"demo"}

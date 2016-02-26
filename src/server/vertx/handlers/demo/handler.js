@@ -40,11 +40,11 @@
   /////////////////////////////////////////////////////////////////////////////
 
   var API = {
-    login: function(args, callback, request, response, config, handler) {
+    login: function(args, callback, routingContext, config, handler) {
 
       console.log(' --demo api login');
 
-      handler.onLogin(request, response, {
+      handler.onLogin(routingContext, {
         userData: {
           id: 0,
           username: 'demo',
@@ -54,8 +54,8 @@
       }, callback);
     },
 
-    logout: function(args, callback, request, response, config, handler) {
-      handler.onLogout(request, response, callback);
+    logout: function(args, callback, routingContext, config, handler) {
+      handler.onLogout(routingContext, callback);
     }
   };
 
@@ -80,27 +80,30 @@
      * By default OS.js will check src/conf for group permissions.
      * This overrides and leaves no checks (full access)
      */
-    DemoHandler.prototype.checkAPIPrivilege = function(request, response, privilege, callback) {
+    DemoHandler.prototype.checkAPIPrivilege = function(routingContext, privilege, callback) {
       console.log(' ***** demo checkAPIPrivilege *****');
-      this._checkHasSession(request, response, callback);
+
+      this._checkHasSession(routingContext, callback);
     };
 
     /**
      * By default OS.js will check src/conf for group permissions.
      * This overrides and leaves no checks (full access)
      */
-    DemoHandler.prototype.checkVFSPrivilege = function(request, response, path, args, callback) {
+    DemoHandler.prototype.checkVFSPrivilege = function(routingContext, path, args, callback) {
       console.log(' ***** demo checkVFSPrivilege *****');
-      this._checkHasSession(request, response, callback);
+
+      this._checkHasSession(routingContext, callback);
     };
 
     /**
      * By default OS.js will check src/conf for group permissions.
      * This overrides and leaves no checks (full access)
      */
-    DemoHandler.prototype.checkPackagePrivilege = function(request, response, packageName, callback) {
+    DemoHandler.prototype.checkPackagePrivilege = function(routingContext, packageName, callback) {
       console.log(' ***** demo checkPackagePrivilege *****');
-      this._checkHasSession(request, response, callback);
+      
+      this._checkHasSession(routingContext, callback);
     };
 
     return new DemoHandler();

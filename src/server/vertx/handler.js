@@ -40,14 +40,14 @@
   function registerAPIMethod(handler, instance, fn, fref) {
     if ( !instance.api[fn] ) {
       if ( ignorePrivilegesAPI.indexOf(fn) < 0 ) {
-        instance.api[fn] = function(args, callback, request, response, config) {
-          handler.checkAPIPrivilege(request, response, fn, function(err) {
+        instance.api[fn] = function(args, callback, routingContext, config) {
+          handler.checkAPIPrivilege(routingContext, fn, function(err) {
             if ( err ) {
               callback(err);
               return;
             }
 
-            fref.apply(fref, [args, callback, request, response, config, handler]);
+            fref.apply(fref, [args, callback, routingContext, config, handler]);
           });
         };
       } else {
@@ -63,8 +63,8 @@
   function registerVFSMethod(handler, instance, fn, fref) {
     if ( !instance.vfs[fn] ) {
       if ( ignorePrivilegesVFS.indexOf(fn) < 0 ) {
-        instance.vfs[fn] = function(args, callback, request, response) {
-          handler.checkAPIPrivilege(request, response, 'fs', function(err) {
+        instance.vfs[fn] = function(args, callback, routingContext) {
+          handler.checkAPIPrivilege(routingContext, 'fs', function(err) {
             if ( err ) {
               callback(err);
               return;
@@ -76,7 +76,7 @@
                 return;
               }
 
-              fref.apply(fref, [args, request, callback, instance.config, handler]);
+              fref.apply(fref, [args, routingContext, callback, instance.config, handler]);
             });
           });
         };
@@ -123,29 +123,29 @@
   /**
    * Gets the username of currently active user
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    *
    * @method Handler::getUserName()
    */
-  DefaultHandler.prototype.getUserName = function(request, response) {
+  DefaultHandler.prototype.getUserName = function(routingContext) {
     console.log(' ******* getUserName *******');
-    //return request.cookies.get('username');
-    return request.get-cookie('username');
+    //return routingContext.cookies.get('username');
+    return routingContext.getCookie('username');
   };
 
   /**
    * Gets the groups of currently active user
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    *
    * @method Handler::getUserGroups()
    */
-  DefaultHandler.prototype.getUserGroups = function(request, response) {
+  DefaultHandler.prototype.getUserGroups = function(routingContext) {
     var groups = [];
     try {
-      groups = JSON.parse(request.cookies.get('groups'));
+      groups = JSON.parse(routingContext.getCookie('groups'));
     } catch ( e ) {
       groups = [];
     }
@@ -155,23 +155,23 @@
   /**
    * Gets the blacklisted packages of active user
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   Function    callback      Callback function => fn(error, result)
    *
    * @async
    * @return  void
    * @method  Handler::getUserBlacklistedPackages()
    */
-  DefaultHandler.prototype.getUserBlacklistedPackages = function(request, response, callback) {
+  DefaultHandler.prototype.getUserBlacklistedPackages = function(routingContext, callback) {
     callback(false, []);
   };
 
   /**
    * Sets the user data of active user
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   Object      data          Session data
    * @param   Function    callback      Callback function => fn(error, result)
    *
@@ -179,31 +179,31 @@
    * @return void
    * @method Handler::setUserData()
    */
-  DefaultHandler.prototype.setUserData = function(request, response, data, callback) {
+  DefaultHandler.prototype.setUserData = function(routingContext, data, callback) {
 
     console.log('setUserData');
     console.log(JSON.stringify(data));
 
     if ( data === null ) {
       console.log('++++ setting null cookies ++++');
-      //request.cookies.set('username', null, {httpOnly:true});
-      //request.cookies.set('groups', null, {httpOnly:true});
+      //routingContext.cookies.set('username', null, {httpOnly:true});
+      //routingContext.cookies.set('groups', null, {httpOnly:true});
     } else {
       console.log('++++ setting cookies ++++');
-      //request.cookies.set('username', data.username, {httpOnly:true});
-      //request.cookies.set('groups', JSON.stringify(data.groups), {httpOnly:true});
+      //routingContext.cookies.set('username', data.username, {httpOnly:true});
+      //routingContext.cookies.set('groups', JSON.stringify(data.groups), {httpOnly:true});
     }
 
     callback(false, true);
   };
 
   /**
-   * Check if request has access to given API request
+   * Check if routingContext has access to given API routingContext
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   Mixed       privilege     Check against given privilege(s)
    * @param   Function    callback      Callback function => fn(err, result)
    *
@@ -212,26 +212,26 @@
    * @async
    * @method Handler::checkAPIPrivilege()
    */
-  DefaultHandler.prototype.checkAPIPrivilege = function(request, response, privilege, callback) {
+  DefaultHandler.prototype.checkAPIPrivilege = function(routingContext, privilege, callback) {
 
     console.log('**checkAPIPrivilege**');
     var self = this;
-    this._checkHasSession(request, response, function(err) {
+    this._checkHasSession(routingContext, function(err) {
       if ( err ) {
         callback(err);
         return;
       }
-      self._checkHasAPIPrivilege(request, response, privilege, callback);
+      self._checkHasAPIPrivilege(routingContext, privilege, callback);
     });
   };
 
   /**
-   * Check if request has access to given VFS request
+   * Check if routingContext has access to given VFS routingContext
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   String      method        VFS Method name
    * @param   Object      args          VFS Method arguments
    * @param   Function    callback      Callback function => fn(err, result)
@@ -241,26 +241,26 @@
    * @async
    * @method Handler::checkVFSPrivilege()
    */
-  DefaultHandler.prototype.checkVFSPrivilege = function(request, response, method, args, callback) {
+  DefaultHandler.prototype.checkVFSPrivilege = function(routingContext, method, args, callback) {
 
     console.log('******* checkVFSPrivilege ******');
     var self = this;
-    this._checkHasSession(request, response, function(err) {
+    this._checkHasSession(routingContext, function(err) {
       if ( err ) {
         callback(err);
         return;
       }
-      self._checkHasVFSPrivilege(request, response, method, args, callback);
+      self._checkHasVFSPrivilege(routingContext, method, args, callback);
     });
   };
 
   /**
-   * Check if request has access to given Package
+   * Check if routingContext has access to given Package
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   String      packageName   Name of Package (ex: repo/name)
    * @param   Function    callback      Callback function => fn(err, result)
    *
@@ -269,14 +269,14 @@
    * @async
    * @method Handler::checkPackagePrivilege()
    */
-  DefaultHandler.prototype.checkPackagePrivilege = function(request, response, packageName, callback) {
+  DefaultHandler.prototype.checkPackagePrivilege = function(routingContext, packageName, callback) {
     var self = this;
-    this._checkHasSession(request, response, function(err) {
+    this._checkHasSession(routingContext, function(err) {
       if ( err ) {
         callback(err);
         return;
       }
-      self._checkHasPackagePrivilege(request, response, packageName, callback);
+      self._checkHasPackagePrivilege(routingContext, packageName, callback);
     });
   };
 
@@ -303,15 +303,15 @@
   /**
    * Event fired when server gets a login
    *
-   * @param     Object        request       Server request object
-   * @param     Object        response      Server response object
+   * @param     Object        routingContext       Server routingContext object
+   * @param     Object        routingContext      Server routingContext object
    * @param     Object        data          The login data
    * @param     Function      callback      Callback fuction
    *
    * @async
    * @method Handler::onLogin()
    */
-  DefaultHandler.prototype.onLogin = function(request, response, data, callback) {
+  DefaultHandler.prototype.onLogin = function(routingContext, data, callback) {
 
     console.log('handler.js onLogin');
     var self = this;
@@ -320,7 +320,7 @@
       if ( data.blacklistedPackages ) {
         callback(false, data);
       } else {
-        self.getUserBlacklistedPackages(request, response, function(error, blacklist) {
+        self.getUserBlacklistedPackages(routingContext, function(error, blacklist) {
           if ( error ) {
             callback(error);
           } else {
@@ -335,7 +335,7 @@
 
     console.log('userSettings: '+ data.userSettings);
 
-    this.setUserData(request, response, data.userData, function() {
+    this.setUserData(routingContext, data.userData, function() {
       finished();
     });
   };
@@ -343,15 +343,15 @@
   /**
    * Event fired when server gets a logout
    *
-   * @param     Object        request       Server request object
-   * @param     Object        response      Server response object
+   * @param     Object        routingContext       Server routingContext object
+   * @param     Object        routingContext      Server routingContext object
    * @param     Function      callback      Callback fuction
    *
    * @async
    * @method Handler::onLogout()
    */
-  DefaultHandler.prototype.onLogout = function(request, response, callback) {
-    this.setUserData(request, response, null, function() {
+  DefaultHandler.prototype.onLogout = function(routingContext, callback) {
+    this.setUserData(routingContext, null, function() {
       callback(false, true);
     });
   };
@@ -361,8 +361,8 @@
    *
    * If the user has group 'admin' it will automatically granted full access
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   String      groupname     Group name(s) (can also be an array)
    * @param   Function    callback      Callback function => fn(err, result)
    *
@@ -371,7 +371,7 @@
    * @async
    * @method Handler::_checkHasGroup()
    */
-  DefaultHandler.prototype._checkHasGroup = function(request, response, groupnames, callback) {
+  DefaultHandler.prototype._checkHasGroup = function(routingContext, groupnames, callback) {
     groupnames = groupnames || [];
     if ( !(groupnames instanceof Array) && groupnames ) {
       groupnames = [groupnames];
@@ -380,7 +380,7 @@
     var self = this;
     var allowed = (function() {
       if ( typeof groupnames !== 'boolean' ) {
-        var groups = self.getUserGroups(request, response);
+        var groups = self.getUserGroups(routingContext);
         if ( groups.indexOf('admin') < 0 ) {
           var allowed = true;
           groupnames.forEach(function(p) {
@@ -402,16 +402,16 @@
   /**
    * Default method for checking if user has a session
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   Function    callback      Callback function => fn(err, result)
    *
    * @async
    * @method Handler::_checkHasSession()
    */
-  DefaultHandler.prototype._checkHasSession = function(request, response, callback) {
+  DefaultHandler.prototype._checkHasSession = function(routingContext, callback) {
     console.log(' ******  _checkHasSession  ******');
-    if ( !this.instance.setup.nw && !this.getUserName(request, response) ) {
+    if ( !this.instance.setup.nw && !this.getUserName(routingContext) ) {
       callback('You have no OS.js Session, please log in!');
       return;
     }
@@ -421,16 +421,16 @@
   /**
    * Default method for checking blacklisted package permissions
    *
-   * @param   Object      request       Server request object
-   * @param   Object      response      Server response object
+   * @param   Object      routingContext       Server routingContext object
+   * @param   Object      routingContext      Server routingContext object
    * @param   String      packageName   Name of the package
    * @param   Function    callback      Callback function => fn(err, result)
    *
    * @async
    * @method Handler::_checkHasBlacklistedPackage()
    */
-  DefaultHandler.prototype._checkHasBlacklistedPackage = function(request, response, packageName, callback) {
-    this.getUserBlacklistedPackages(request, response, function(error, list) {
+  DefaultHandler.prototype._checkHasBlacklistedPackage = function(routingContext, packageName, callback) {
+    this.getUserBlacklistedPackages(routingContext, function(error, list) {
       if ( error ) {
         callback(error, false);
       } else {
@@ -446,10 +446,10 @@
    * @see Handler::checkAPIPrivilege()
    * @method Handler::_checkHasAPIPrivilege()
    */
-  DefaultHandler.prototype._checkHasAPIPrivilege = function(request, response, privilege, callback) {
+  DefaultHandler.prototype._checkHasAPIPrivilege = function(routingContext, privilege, callback) {
     var map = this.instance.config.api.groups;
     if ( map && privilege && map[privilege] ) {
-      this._checkHasGroup(request, response, privilege, function(err, res) {
+      this._checkHasGroup(routingContext, privilege, function(err, res) {
         if ( !res && !err ) {
           err = 'You are not allowed to use this API function!';
         }
@@ -471,8 +471,8 @@
    * @see Handler::checkVFSPrivilege()
    * @method Handler::_checkHasVFSPrivilege()
    */
-  DefaultHandler.prototype._checkHasVFSPrivilege = function(request, response, method, args, callback) {
-    var mount = this.instance.vfs.getRealPath(args.path || args.src, this.instance.config, request);
+  DefaultHandler.prototype._checkHasVFSPrivilege = function(routingContext, method, args, callback) {
+    var mount = this.instance.vfs.getRealPath(args.path || args.src, this.instance.config, routingContext);
     var cfg = this.instance.config.vfs.groups;
     var against;
 
@@ -481,7 +481,7 @@
     } catch ( e ) {}
 
     if ( against ) {
-      this._checkHasGroup(request, response, against, function(err, res) {
+      this._checkHasGroup(routingContext, against, function(err, res) {
         if ( !res && !err ) {
           err = 'You are not allowed to use this VFS function!';
         }
@@ -502,7 +502,7 @@
    * @see Handler::checkPackagePrivilege()
    * @method Handler::_checkHasPackagePrivilege()
    */
-  DefaultHandler.prototype._checkHasPackagePrivilege = function(request, response, packageName, callback) {
+  DefaultHandler.prototype._checkHasPackagePrivilege = function(routingContext, packageName, callback) {
     var packages = this.instance.metadata;
     var self = this;
 
@@ -511,12 +511,12 @@
     }
 
     if ( packages && packages[packageName] && packages[packageName].groups ) {
-      this._checkHasGroup(request, response, packages[packageName].groups, function(err, res) {
+      this._checkHasGroup(routingContext, packages[packageName].groups, function(err, res) {
         if ( err ) {
           notallowed(err);
         } else {
           if ( res ) {
-            self._checkHasBlacklistedPackage(request, response, packageName, function(err, res) {
+            self._checkHasBlacklistedPackage(routingContext, packageName, function(err, res) {
               if ( err || !res ) {
                 notallowed(err);
               } else {
@@ -545,8 +545,8 @@
    */
   function NWHandler(instance) {
     DefaultHandler.call(this, instance, {
-      login: function(args, callback, request, response, config, handler) {
-        handler.onLogin(request, response, {
+      login: function(args, callback, routingContext, config, handler) {
+        handler.onLogin(routingContext, {
           userData: {
             id: 0,
             username: 'nw',
@@ -555,8 +555,8 @@
           }
         }, callback);
       },
-      logout: function(args, callback, request, response, config, handler) {
-        handler.onLogout(request, response, callback);
+      logout: function(args, callback, routingContext, config, handler) {
+        handler.onLogout(routingContext, callback);
       }
     });
   }

@@ -34,7 +34,7 @@
 
   _server.listen({
     port: null,
-    dirname: "src/server/",
+    dirname: "src/server/vertx/",
     root: "",
     dist: "dist-dev",
     logging: true,

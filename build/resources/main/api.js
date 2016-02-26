@@ -39,8 +39,8 @@
    *
    * @param   Object    args        API Call Arguments
    * @param   Function  callback    Callback function => fn(error, result)
-   * @param   Object    request     Server request object
-   * @param   Object    response    Server response object
+   * @param   Object    routingContext     Server routingContext object
+   * @param   Object    routingContext    Server routingContext object
    * @param   Object    config      Server configuration object
    *
    * @option  args      String    username    Username
@@ -50,7 +50,7 @@
    *
    * @api     api.login
    */
-  module.exports.login = function(args, callback, request, response, config) {
+  module.exports.login = function(args, routingContext, config) {
     callback('No handler assigned', {});
   };
 
@@ -59,15 +59,15 @@
    *
    * @param   Object    args        API Call Arguments
    * @param   Function  callback    Callback function => fn(error, result)
-   * @param   Object    request     Server request object
-   * @param   Object    response    Server response object
+   * @param   Object    routingContext     Server routingContext object
+   * @param   Object    routingContext    Server routingContext object
    * @param   Object    config      Server configuration object
    *
    * @return  void
    *
    * @api     api.logout
    */
-  module.exports.logout = function(args, callback, request, response, config) {
+  module.exports.logout = function(args, routingContext, config) {
     callback('No handler assigned', {});
   };
 
@@ -76,8 +76,8 @@
    *
    * @param   Object    args        API Call Arguments
    * @param   Function  callback    Callback function => fn(error, result)
-   * @param   Object    request     Server request object
-   * @param   Object    response    Server response object
+   * @param   Object    routingContext     Server routingContext object
+   * @param   Object    routingContext    Server routingContext object
    * @param   Object    config      Server configuration object
    *
    * @option  args      Object    settings    Settings Tree
@@ -86,7 +86,7 @@
    *
    * @api     api.settings
    */
-  module.exports.settings = function(args, callback, request, response, config) {
+  module.exports.settings = function(args, routingContext, config) {
     callback('No handler assigned', {});
   };
 
@@ -95,8 +95,8 @@
    *
    * @param   Object    args        API Call Arguments
    * @param   Function  callback    Callback function => fn(error, result)
-   * @param   Object    request     Server request object
-   * @param   Object    response    Server response object
+   * @param   Object    routingContext     Server routingContext object
+   * @param   Object    routingContext    Server routingContext object
    * @param   Object    config      Server configuration object
    *
    * @option  args      String    path        Package Path (ex: default/FileManager)
@@ -107,7 +107,7 @@
    *
    * @api     api.application
    */
-  module.exports.application = function(args, callback, request, response, config) {
+  module.exports.application = function(args, routingContext, config) {
     var apath = args.path || null;
     var ameth = args.method || null;
     var aargs = args['arguments'] || [];
@@ -118,7 +118,7 @@
     try {
       require(fpath)[ameth](aargs, function(error, result) {
         callback(error, result);
-      }, request, response);
+      }, routingContext);
     } catch ( e ) {
       if ( config.logging !== false ) {
         console.warn(e.stack, e.trace);
@@ -134,8 +134,8 @@
    *
    * @param   Object    args        API Call Arguments
    * @param   Function  callback    Callback function => fn(error, result)
-   * @param   Object    request     Server request object
-   * @param   Object    response    Server response object
+   * @param   Object    routingContext     Server routingContext object
+   * @param   Object    routingContext    Server routingContext object
    * @param   Object    config      Server configuration object
    *
    * @option  args      String    method      HTTP Call method (GET/POST/HEAD)
@@ -150,14 +150,14 @@
    *
    * @api     api.curl
    */
-  module.exports.curl = function(args, callback, request, response, config) {
+  module.exports.curl = function(args, routingContext, config) {
     var url = args.url;
     var method = args.method || 'GET';
     var query = args.query || {};
     var timeout = args.timeout || 0;
     var binary = args.binary === true;
     var mime = args.mime || null;
-    var headers = args.requestHeaders || {};
+    var headers = args.routingContextHeaders || {};
 
     if ( !mime && binary ) {
       mime = 'application/octet-stream';
@@ -184,7 +184,7 @@
       opts.encoding = null;
     }
 
-    /*require('request')(opts, function(error, response, body) {
+    /*require('routingContext')(opts, function(error, routingContext, body) {
       if ( error ) {
         callback(error);
         return;
@@ -195,7 +195,7 @@
       }
 
       var data = {
-        httpCode: response.statusCode,
+        httpCode: routingContext.statusCode,
         body: body
       };
 

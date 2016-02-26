@@ -1,4 +1,4 @@
-(function(_osjs, _eb, _fs, Router, SockJSHandler, StaticHandler, CookieHandler, Cookie, _path){
+(function(_osjs, _path, _eb, _fs, Router, SockJSHandler, StaticHandler, CookieHandler, Cookie){
   'use strict';
 
   var instance, server;
@@ -14,7 +14,7 @@
   /**
    * Respond to HTTP Call
    */
-  function respond(data, mime, response, headers, code, pipeFile) {
+  function respond(data, mime, routingContext, headers, code, pipeFile) {
     console.log('respond');
 
 
@@ -23,32 +23,34 @@
     }
 
     function done() {
+      console.log('******** Done *********');
       if ( instance.handler && instance.handler.onRequestEnd ) {
-        instance.handler.onRequestEnd(null, response);
+        instance.handler.onRequestEnd(null, routingContext);
       }
-      response.end();
+      routingContext.respond().end();
     }
 
     headers.forEach(function(h) {
-      response.writeHead.apply(response, h);
+      routingContext.writeHead.apply(routingContext, h);
     });
 
-    response.putHeader('Content-Type', mime);
+    routingContext.response().putHeader('Content-Type', mime);
 
     if ( pipeFile ) {
       console.log('pipeFile: ' + pipeFile);
 
       //var stream = _fs.createReadStream(pipeFile, {bufferSize: 64 * 1024});
       //stream.on('end', done);
-      //stream.pipe(response);
+      //stream.pipe(routingContext);
 
-      //response.write(data).end();
-      response.sendFile(pipeFile);
+      //routingContext.write(data).end();
+      routingContext.response().sendFile(pipeFile);
 
 
     } else {
+      console.log('not pipeFile');
 
-      response.write(data);
+      routingContext.response().write(data);
       done();
     }
   }
@@ -56,7 +58,7 @@
   /**
    * Respond with a file
    */
-  function respondFile(path, request, response, realPath) {
+  function respondFile(path, routingContext, realPath) {
     console.log('respondFile');
 
     if ( !realPath && path.match(/^(ftp|https?)\:\/\//) ) {
@@ -67,24 +69,24 @@
 
           var paths = OSjs.VFS.getRealPath(path);
           if (DEBUG) console.log('http FS get ' + paths.path);
-          response.sendFile(paths.full);
+          routingContext.sendFile(paths.full);
 
-          //require('request')(path).pipe(response);
+          //require('routingContext')(path).pipe(routingContext);
 
 
         } catch ( e ) {
           console.error('!!! Caught exception', e);
           console.warn(e.stack);
-          respondError(e, response);
+          respondError(e, routingContext);
         }
       } else {
-        respondError('VFS Proxy is disabled', response);
+        respondError('VFS Proxy is disabled', routingContext);
       }
       return;
     }
 
     try {
-      var fullPath = realPath ? path : instance.vfs.getRealPath(path, instance.config, request).root;
+      var fullPath = realPath ? path : instance.vfs.getRealPath(path, instance.config, routingContext).root;
       _fs.exists(fullPath, function(exists) {
         if ( exists ) {
 
@@ -93,51 +95,51 @@
           var mime = instance.vfs.getMime(fullPath, instance.config);
           console.log('mime: ' +  mime);
 
-          respond(null, mime, response, [], 200, fullPath);
+          respond(null, mime, routingContext, [], 200, fullPath);
 
         } else {
-          respondNotFound(null, response, fullPath);
+          respondNotFound(null, routingContext, fullPath);
         }
       });
     } catch ( e ) {
       console.error('!!! Caught exception', e);
       console.warn(e.stack);
-      respondError(e, response, true);
+      respondError(e, routingContext, true);
     }
   }
 
   /**
    * Respond with JSON data
    */
-  function respondJSON(data, response, headers, code) {
-    respond(JSON.stringify(data), 'application/json', response, headers || [], code || 200);
+  function respondJSON(data, routingContext, headers, code) {
+    respond(JSON.stringify(data), 'application/json', routingContext, headers || [], code || 200);
   }
 
   /**
    * Respond with an error
    */
-  function respondError(message, response, json) {
+  function respondError(message, routingContext, json) {
     if ( json ) {
       message = 'Internal Server Error (HTTP 500): ' + message.toString();
-      respondJSON({result: null, error: message}, response, [], 500);
+      respondJSON({result: null, error: message}, routingContext, [], 500);
     } else {
-      respond(message.toString(), 'text/plain', response, [], 500);
+      respond(message.toString(), 'text/plain', routingContext, [], 500);
     }
   }
 
   /**
    * Respond with text
    */
-  function respondText(response, message) {
-    respond(message, 'text/plain', response, [], 200);
+  function respondText(routingContext, message) {
+    respond(message, 'text/plain', routingContext, [], 200);
   }
 
   /**
    * Respond with 404
    */
-  function respondNotFound(message, response, fullPath) {
+  function respondNotFound(message, routingContext, fullPath) {
     message = message || '404 Not Found';
-    respond(message, null, response, [], 404, false);
+    respond(message, null, routingContext, [], 404, false);
   }
 
   /**
@@ -162,8 +164,6 @@
   /////////////////////////////////////////////////////////////////////////////
 
 
-
-
   function startServer() {
 
     var router = Router.router(vertx);
@@ -175,31 +175,22 @@
     if (ONBUS) {
 
       router.route('GET', "/FS/get/*").handler(function (rc) {
-        var path = rc.request().path().replace('/FS/get/', '');
+        var path = rc.routingContext().path().replace('/FS/get/', '');
         var paths = OSjs.VFS.getRealPath(path);
         if (DEBUG) console.log('http FS get ' + paths.path);
-        rc.response().sendFile(paths.full);
+        rc.routingContext().sendFile(paths.full);
       });
       router.route().handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("dist-dev").handle);
 
     } else {
 
-///////////////////////////////////////////////
-//////////////////////////////////////////////
-/////////////////////////////////////////////
-////////////////////////////////////////////
-///////////////////////////////////////////
 
       router.route().handler(CookieHandler.create().handle);
-      router.route().handler(function (rc) {
+      router.route().handler(function (routingContext) {
 
-        var request = rc.request();
-        var response = rc.response();
-        var path = request.path();
+        var path = routingContext.request().path();
 
-        //var cookies = new Cookies(request, response);
-
-        request.cookies = rc.cookies();
+        // cookies
 
         if (path === '/') {
           path += 'index.html';
@@ -210,14 +201,14 @@
          }*/
 
         if (instance.handler && instance.handler.onRequestStart) {
-          instance.handler.onRequestStart(request, response);
+          instance.handler.onRequestStart(routingContext);
         }
 
         var isVfsCall = path.match(/^\/FS/) !== null;
         var relPath = path.replace(/^\/(FS|API)\/?/, '');
 
 
-        console.log(request.method());
+        console.log(routingContext.request().method());
         console.log('-=-=-=- isVfsCall: ' + isVfsCall);
         console.log('-=-=-=- relPath: ' + relPath);
 
@@ -232,13 +223,13 @@
           console.log(path);
 
 
-          //request.on('data', function(data) {
+          //routingContext.on('data', function(data) {
           //  body += data;
           //});
 
-          //request.on('end', function() {
+          //routingContext.on('end', function() {
 
-          request.bodyHandler(function (body) {
+          routingContext.request().bodyHandler(function (body) {
 
             try {
 
@@ -250,15 +241,15 @@
 
                 console.log('--req resulting---');
 
-                respondJSON({result: result, error: error}, response);
+                respondJSON({result: result, error: error}, routingContext);
 
-              }, request, response, instance.handler);
+              }, routingContext, instance.handler);
 
             } catch (e) {
 
               console.error('!!! Caught exception', e);
               console.warn(e.stack);
-              //respondError(e, response, true);
+              //respondError(e, routingContext, true);
 
             }
           });
@@ -271,15 +262,15 @@
             uploadDir: instance.config.tmpdir
           });
 
-          form.parse(request, function (err, fields, files) {
+          form.parse(routingContext, function (err, fields, files) {
             if (err) {
               if (instance.config.logging) {
-                respondError(err, response);
+                respondError(err, routingContext);
               }
             } else {
-              instance.handler.checkAPIPrivilege(request, response, 'upload', function (err) {
+              instance.handler.checkAPIPrivilege(routingContext, 'upload', function (err) {
                 if (err) {
-                  respondError(err, response);
+                  respondError(err, routingContext);
                   return;
                 }
 
@@ -290,11 +281,11 @@
                   overwrite: String(fields.overwrite) === 'true'
                 }, function (err, result) {
                   if (err) {
-                    respondError(err, response);
+                    respondError(err, routingContext);
                     return;
                   }
-                  respondText(response, '1');
-                }, request, response);
+                  respondText(routingContext, '1');
+                }, routingContext);
               });
             }
           });
@@ -302,12 +293,12 @@
 
         function handleVFSFile() {
           var dpath = path.replace(/^\/(FS|API)(\/get\/)?/, '');
-          instance.handler.checkAPIPrivilege(request, response, 'fs', function (err) {
+          instance.handler.checkAPIPrivilege(routingContext, 'fs', function (err) {
             if (err) {
-              respondError(err, response);
+              respondError(err, routingContext);
               return;
             }
-            respondFile(unescape(dpath), request, response, false);
+            respondFile(unescape(dpath), routingContext, false);
           });
         }
 
@@ -319,28 +310,28 @@
           console.log('rpath: ' + rpath);
           console.log('dpath: ' + dpath);
 
-          // Checks if the request was a package resource
+          // Checks if the routingContext was a package resource
           var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
           if (pmatch && pmatch.length === 3) {
-            instance.handler.checkPackagePrivilege(request, response, pmatch[1], function (err) {
+            instance.handler.checkPackagePrivilege(routingContext, pmatch[1], function (err) {
               if (err) {
-                respondError(err, response);
+                respondError(err, routingContext);
                 return;
               }
               console.log('..pmatch..');
 
-              respondFile(unescape(dpath), request, response, true);
+              respondFile(unescape(dpath), routingContext, true);
             });
             return;
           }
 
           console.log('..else..');
           // Everything else
-          respondFile(unescape(dpath), request, response, true);
+          respondFile(unescape(dpath), routingContext, true);
         }
 
 
-        if (request.method() === 'POST') {
+        if (routingContext.request().method() === 'POST') {
           if (isVfsCall) {
             if (relPath === 'upload') {
               handleUpload();
@@ -425,33 +416,45 @@
 
     startServer();
 
-    setTimeout(function(){
-      console.log('***');
-      console.log('*** OS.js vertx is listening on port ' + setup.port);
-      console.log('***');
-    }, 10);
+    instance.handler.onServerStart(function() {
+      var port = setup.port || instance.config.port;
+      if ( instance.config.logging ) {
+        setTimeout(function(){
+          console.log('***');
+          console.log('*** OS.js(v) is listening on http://localhost:' + port);
+          console.log('***');
+        }, 5);
+      }
+    });
 
   };
 
+  /**
+   * Closes the active HTTP server
+   *
+   * @param   Function  cb          Callback function
+   *
+   * @api     http.close
+   */
   module.exports.close = function(cb) {
     cb = cb || function() {};
 
-    cb();
-    vertx.close();
+    instance.handler.onServerEnd(function() {
+      cb();
+      vertx.close();
+    });
 
   };
-
-
 
 
 })(
   require("./osjs"),
+  require("./path"),
   vertx.eventBus(),
   vertx.fileSystem(),
   require("vertx-web-js/router"),
   require("vertx-web-js/sock_js_handler"),
   require("vertx-web-js/static_handler"),
   require("vertx-web-js/cookie_handler"),
-  require("vertx-web-js/cookie"),
-  require("./path")
+  require("vertx-web-js/cookie")
 );

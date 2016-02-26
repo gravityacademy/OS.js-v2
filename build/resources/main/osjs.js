@@ -27,7 +27,7 @@
  * @author  Anders Evenrud <andersevenrud@gmail.com>
  * @licence Simplified BSD License
  */
-(function(_fs) {
+(function(_path, _fs) {
   'use strict';
 
   /////////////////////////////////////////////////////////////////////////////
@@ -68,16 +68,16 @@
   /**
    * API Request proxy
    */
-  function request(isVfs, method, args, callback, req, response, handler) {
+  function request(isVfs, method, args, callback, routingContext, handler) {
 
     console.log('-----***** request *****-----');
 
-    response = response || defaultResponse();
-    req = req || defaultRequest();
+    //routingContext.response = routingContext.response || defaultResponse();
+    //routingContext.request = routingContext.request || defaultRequest();
 
     if ( isVfs ) {
       if ( vfsNamespace[method] && ((['getMime', 'getRealPath']).indexOf(method) < 0) ) {
-        vfsNamespace[method](args, callback, req, response, config, handler);
+        vfsNamespace[method](args, callback, routingContext, config, handler);
         return;
       }
       throw 'Invalid VFS method: ' + method;
@@ -86,7 +86,7 @@
         console.log('apiNamespace');
         console.log('method: '+method);
 
-        apiNamespace[method](args, callback, req, response, config, handler);
+        apiNamespace[method](args, callback, routingContext, config, handler);
 
         return;
       }
@@ -119,22 +119,25 @@
    * @api     osjs.init
    */
   module.exports.init = function(setup) {
-
     console.log('osjs.init');
+
     setup.dist     = setup.dist     || 'dist';
-    setup.settings = setup.settings || setup.dirname + 'settings.json';
-    setup.repodir  = setup.repodir  || setup.root + 'src/packages';
-    setup.distdir  = setup.distdir  || setup.root + setup.dist;
+    setup.settings = setup.settings || _path.join(_path.dirname(setup.dirname), 'settings.json');
+    setup.repodir  = setup.repodir  || _path.join(setup.root, 'src', 'packages');
+    setup.distdir  = setup.distdir  || _path.join(setup.root, setup.dist);
     setup.logging  = typeof setup.logging === 'undefined' || setup.logging === true;
 
     if ( setup.nw ) {
-      setup.repodir = setup.root + 'packages';
+      setup.repodir = _path.join(setup.root, 'packages');
       setup.distdir = setup.root;
     }
+
+    console.log(JSON.stringify(setup));
+
     console.log('osjs.ini2');
 
     // Register manifest
-    var metadata = JSON.parse( _fs.readFileBlocking( setup.dirname + 'packages.json').toString("UTF-8") );
+    var metadata = JSON.parse( _fs.readFileBlocking( _path.join(_path.dirname(setup.dirname), 'packages.json') ) );
 
     console.log('osjs.ini3');
 
@@ -178,4 +181,7 @@
     return instance;
   };
 
-})(vertx.fileSystem());
+})(
+  require("./path"),
+  vertx.fileSystem()
+);
