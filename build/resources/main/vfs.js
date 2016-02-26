@@ -26,8 +26,10 @@
  *
  * @author  Anders Evenrud <andersevenrud@gmail.com>
  * @licence Simplified BSD License
+ *
+ * vertx version  -tfs
  */
-(function(eb, fs, Buffer, Base64) {
+(function(_eb, _fs, _Buffer, _Base64) {
   'use strict';
 
 
@@ -116,7 +118,7 @@
       data = decodeURI(data.substring(data.indexOf(',') + 1));
       data = new Buffer.buffer(Base64.decode(data));
 
-      fs.writeFile(paths.full, data, function(data, error) {
+      _fs.writeFile(paths.full, data, function(data, error) {
 
         if ( error ) {
           console.log('Error writing file: ' + error);
@@ -157,7 +159,7 @@
 
     console.log('VFS.exists: ' + paths.full);
 
-    fs.exists(paths.full, function(result) {
+    _fs.exists(paths.full, function(result) {
 
       console.log(JSON.stringify(result));
       message.reply(result);
@@ -178,7 +180,7 @@
 
     console.log('VFS.scandir: ' + paths.full);
 
-    fs.readDir(paths.full, function(res, err) {
+    _fs.readDir(paths.full, function(res, err) {
 
       if (err) {
 
@@ -227,7 +229,7 @@
       var path;
       var ftype, fsize, ctime, mtime;
 
-      fs.props(filePath, function (res, err) {
+      _fs.props(filePath, function (res, err) {
 
         if (err) {
 

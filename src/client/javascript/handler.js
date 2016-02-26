@@ -35,7 +35,7 @@
   OSjs.Core     = OSjs.Core     || {};
 
   var _handlerInstance;
-  var VERTX = true;
+  var EBUS = true;
 
   /////////////////////////////////////////////////////////////////////////////
   // DEFAULT HANDLING CODE
@@ -409,7 +409,7 @@
     };
 
 
-    if (VERTX) {
+    if (EBUS) {
 
       var afterCheck = function() {
         window.eb.send('OSjsCallXHR', {url: url, args: args, options: options}, function (err, res) {
@@ -509,7 +509,7 @@
     };
 
 
-    if (VERTX) {
+    if (EBUS) {
 
       window.eb.send('OSjsCallPOST', {args: args, options: options}, function (err, res) {
         if (err) cbError(err);
@@ -567,7 +567,7 @@
     };
 
 
-    if (VERTX) {
+    if (EBUS) {
 
       window.eb.send('OSjsCallGET', {args: args, options: options}, function (err, res) {
         if (err) cbError(err);

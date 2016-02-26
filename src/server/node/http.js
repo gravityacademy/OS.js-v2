@@ -171,10 +171,10 @@
     if ( path === '/' ) {
       path += 'index.html';
     }
-
-    if ( instance.config.logging ) {
-      log(timestamp(), '<<<', path);
-    }
+    console.log(path);
+    //if ( instance.config.logging ) {
+    //  log(timestamp(), '<<<', path);
+    //}
 
     if ( instance.handler && instance.handler.onRequestStart ) {
       instance.handler.onRequestStart(request, response);
@@ -182,6 +182,9 @@
 
     var isVfsCall = path.match(/^\/FS/) !== null;
     var relPath   = path.replace(/^\/(FS|API)\/?/, '');
+
+
+
 
     function handleCall(isVfs) {
       var body = '';
@@ -269,6 +272,8 @@
       // Everything else
       respondFile(unescape(dpath), request, response, true);
     }
+
+
 
     if ( request.method === 'POST' ) {
       if ( isVfsCall ) {

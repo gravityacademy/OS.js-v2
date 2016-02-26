@@ -1,93 +1,457 @@
-var Router = require("vertx-web-js/router");
-var SockJSHandler = require("vertx-web-js/sock_js_handler");
-var StaticHandler = require("vertx-web-js/static_handler");
-var BridgeEvent = require("vertx-web-js/bridge_event");
-var System = Java.type("java.lang.System");
-var CookieHandler = require("vertx-web-js/cookie_handler");
-var BodyHandler = require("vertx-web-js/body_handler");
-var LocalSessionStore = require("vertx-web-js/local_session_store");
-var SessionHandler = require("vertx-web-js/session_handler");
-var ShiroAuth = require("vertx-auth-shiro-js/shiro_auth");
-var UserSessionHandler = require("vertx-web-js/user_session_handler");
-var RedirectAuthHandler = require("vertx-web-js/redirect_auth_handler");
-var FormLoginHandler = require("vertx-web-js/form_login_handler");
-var User = require("vertx-auth-common-js/user");
-var router = Router.router(vertx);
-var eb = vertx.eventBus();
-var fs = vertx.fileSystem();
+(function(_osjs, _eb, _fs, Router, SockJSHandler, StaticHandler, CookieHandler, Cookie, _path){
+  'use strict';
 
-global.DEBUG = true;
-global.OSjs = {
-  API: require("./api.js"),
-  VFS: require("./vfs.js")
-};
+  var instance, server;
 
-var options = {
-  "outboundPermitteds" : [{ "setAddressRegex" : "/^OSjs/" }],
-  "inboundPermitteds" :  [{ "setAddressRegex" : "/^OSjs/" }]};
+  var ONBUS = false;
+  var API = require('./vapi');
+  var VFS = require('./vvfs');
+
+  /////////////////////////////////////////////////////////////////////////////
+  // HELPERS
+  /////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Respond to HTTP Call
+   */
+  function respond(data, mime, response, headers, code, pipeFile) {
+    console.log('respond');
 
 
-router.route("/eventbus/*").handler(SockJSHandler.create(vertx).bridge(options).handle);
+    if ( instance.config.logging ) {
+      log(timestamp(), '>>>', code, mime, pipeFile || typeof data);
+    }
 
-router.route('GET', "/FS/get/*").handler(function (rc) {
-  var path = rc.request().path().replace('/FS/get/', '');
-  var paths = OSjs.VFS.getRealPath(path);
-  if (DEBUG) console.log('http FS get ' + paths.path);
-  rc.response().sendFile(paths.full);
-});
+    function done() {
+      if ( instance.handler && instance.handler.onRequestEnd ) {
+        instance.handler.onRequestEnd(null, response);
+      }
+      response.end();
+    }
 
-router.route().handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("dist-dev").handle);
+    headers.forEach(function(h) {
+      response.writeHead.apply(response, h);
+    });
 
-vertx.createHttpServer().requestHandler(router.accept).listen(8000);
+    response.putHeader('Content-Type', mime);
+
+    if ( pipeFile ) {
+      console.log('pipeFile: ' + pipeFile);
+
+      //var stream = _fs.createReadStream(pipeFile, {bufferSize: 64 * 1024});
+      //stream.on('end', done);
+      //stream.pipe(response);
+
+      //response.write(data).end();
+      response.sendFile(pipeFile);
 
 
-eb.consumer('OSjsCallXHR', function(message) {
+    } else {
 
-  var msg = message.body();     //  {url:url, args:args, options:options}
-  var pair = msg.url.substring(1).split('/');
-  var call = pair[0];
-  var method = pair[1];
-  if (DEBUG) {
-    console.log( 'calling: ' + call + ' method: ' + method);
-    //console.log(JSON.stringify(msg.args));
+      response.write(data);
+      done();
+    }
   }
-  switch (call) {
-    case 'API': OSjs.API[method](msg.args, message); break;
-    case 'FS' : OSjs.VFS[method](msg.args, message); break;
+
+  /**
+   * Respond with a file
+   */
+  function respondFile(path, request, response, realPath) {
+    console.log('respondFile');
+
+    if ( !realPath && path.match(/^(ftp|https?)\:\/\//) ) {
+      if ( instance.config.vfs.proxy ) {
+        try {
+
+
+
+          var paths = OSjs.VFS.getRealPath(path);
+          if (DEBUG) console.log('http FS get ' + paths.path);
+          response.sendFile(paths.full);
+
+          //require('request')(path).pipe(response);
+
+
+        } catch ( e ) {
+          console.error('!!! Caught exception', e);
+          console.warn(e.stack);
+          respondError(e, response);
+        }
+      } else {
+        respondError('VFS Proxy is disabled', response);
+      }
+      return;
+    }
+
+    try {
+      var fullPath = realPath ? path : instance.vfs.getRealPath(path, instance.config, request).root;
+      _fs.exists(fullPath, function(exists) {
+        if ( exists ) {
+
+          console.log('it exists');
+
+          var mime = instance.vfs.getMime(fullPath, instance.config);
+          console.log('mime: ' +  mime);
+
+          respond(null, mime, response, [], 200, fullPath);
+
+        } else {
+          respondNotFound(null, response, fullPath);
+        }
+      });
+    } catch ( e ) {
+      console.error('!!! Caught exception', e);
+      console.warn(e.stack);
+      respondError(e, response, true);
+    }
   }
-});
 
-eb.consumer('OSjsCallPOST', function(message) {
-  console.log('OSjsCallPOST');
+  /**
+   * Respond with JSON data
+   */
+  function respondJSON(data, response, headers, code) {
+    respond(JSON.stringify(data), 'application/json', response, headers || [], code || 200);
+  }
 
-  var mes = message.body();
-  var paths = OSjs.VFS.getRealPath(mes.args.path);
+  /**
+   * Respond with an error
+   */
+  function respondError(message, response, json) {
+    if ( json ) {
+      message = 'Internal Server Error (HTTP 500): ' + message.toString();
+      respondJSON({result: null, error: message}, response, [], 500);
+    } else {
+      respond(message.toString(), 'text/plain', response, [], 500);
+    }
+  }
 
-  fs.writeFile(paths.full, function(result, error){
-    if(error) message.reply(false);
-    else message.reply(true);
-  });
-});
+  /**
+   * Respond with text
+   */
+  function respondText(response, message) {
+    respond(message, 'text/plain', response, [], 200);
+  }
 
-eb.consumer('OSjsCallGET', function(message) {
-  console.log('OSjsCallGET');
+  /**
+   * Respond with 404
+   */
+  function respondNotFound(message, response, fullPath) {
+    message = message || '404 Not Found';
+    respond(message, null, response, [], 404, false);
+  }
 
-  var mes = message.body();
-  var paths = OSjs.VFS.getRealPath(mes.args.path);
+  /**
+   * Gets timestamp
+   */
+  function timestamp() {
+    var now = new Date();
+    return now.toISOString();
+  }
 
-  fs.readFile(paths.full, function(result, error){
-  	if (error == null) {
-      if (DEBUG) console.log('callGet ' + paths.path);
-      message.reply(result.toString("UTF-8"));
-  	} else {
-      console.log('fs error');
-      console.log(JSON.stringify(error));
-  	}
-  })
-});
+  /**
+   * Logs a line
+   */
+  function log() {
+    console.log(Array.prototype.slice.call(arguments).join(' '));
+  }
 
-setTimeout(function(){
-  console.log('***');
-  console.log('*** OS.js vertx is listening on port ' + config.port);
-  console.log('***');
-}, 300);
+
+
+  /////////////////////////////////////////////////////////////////////////////
+  // HTTP
+  /////////////////////////////////////////////////////////////////////////////
+
+
+
+
+  function startServer() {
+
+    var router = Router.router(vertx);
+    var options = {
+      "outboundPermitteds" : [{ "setAddressRegex" : "/^OSjs/" }],
+      "inboundPermitteds" :  [{ "setAddressRegex" : "/^OSjs/" }]};
+    router.route("/eventbus/*").handler(SockJSHandler.create(vertx).bridge(options).handle);
+
+    if (ONBUS) {
+
+      router.route('GET', "/FS/get/*").handler(function (rc) {
+        var path = rc.request().path().replace('/FS/get/', '');
+        var paths = OSjs.VFS.getRealPath(path);
+        if (DEBUG) console.log('http FS get ' + paths.path);
+        rc.response().sendFile(paths.full);
+      });
+      router.route().handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("dist-dev").handle);
+
+    } else {
+
+///////////////////////////////////////////////
+//////////////////////////////////////////////
+/////////////////////////////////////////////
+////////////////////////////////////////////
+///////////////////////////////////////////
+
+      router.route().handler(CookieHandler.create().handle);
+      router.route().handler(function (rc) {
+
+        var request = rc.request();
+        var response = rc.response();
+        var path = request.path();
+
+        //var cookies = new Cookies(request, response);
+
+        request.cookies = rc.cookies();
+
+        if (path === '/') {
+          path += 'index.html';
+        }
+
+        /*if ( instance.config.logging ) {
+         log(timestamp(), '<<<', path);
+         }*/
+
+        if (instance.handler && instance.handler.onRequestStart) {
+          instance.handler.onRequestStart(request, response);
+        }
+
+        var isVfsCall = path.match(/^\/FS/) !== null;
+        var relPath = path.replace(/^\/(FS|API)\/?/, '');
+
+
+        console.log(request.method());
+        console.log('-=-=-=- isVfsCall: ' + isVfsCall);
+        console.log('-=-=-=- relPath: ' + relPath);
+
+
+        function handleCall(isVfs) {
+
+          console.log('handleCall');
+          console.log('handleCall');
+          console.log('handleCall');
+          console.log('handleCall');
+          console.log('handleCall');
+          console.log(path);
+
+
+          //request.on('data', function(data) {
+          //  body += data;
+          //});
+
+          //request.on('end', function() {
+
+          request.bodyHandler(function (body) {
+
+            try {
+
+              var args = JSON.parse(body);
+
+              console.log(JSON.stringify(args));
+
+              instance.request(isVfs, relPath, args, function (error, result) {
+
+                console.log('--req resulting---');
+
+                respondJSON({result: result, error: error}, response);
+
+              }, request, response, instance.handler);
+
+            } catch (e) {
+
+              console.error('!!! Caught exception', e);
+              console.warn(e.stack);
+              //respondError(e, response, true);
+
+            }
+          });
+
+        }
+
+
+        function handleUpload() {
+          var form = new _multipart.IncomingForm({
+            uploadDir: instance.config.tmpdir
+          });
+
+          form.parse(request, function (err, fields, files) {
+            if (err) {
+              if (instance.config.logging) {
+                respondError(err, response);
+              }
+            } else {
+              instance.handler.checkAPIPrivilege(request, response, 'upload', function (err) {
+                if (err) {
+                  respondError(err, response);
+                  return;
+                }
+
+                instance.vfs.upload({
+                  src: files.upload.path,
+                  name: files.upload.name,
+                  path: fields.path,
+                  overwrite: String(fields.overwrite) === 'true'
+                }, function (err, result) {
+                  if (err) {
+                    respondError(err, response);
+                    return;
+                  }
+                  respondText(response, '1');
+                }, request, response);
+              });
+            }
+          });
+        }
+
+        function handleVFSFile() {
+          var dpath = path.replace(/^\/(FS|API)(\/get\/)?/, '');
+          instance.handler.checkAPIPrivilege(request, response, 'fs', function (err) {
+            if (err) {
+              respondError(err, response);
+              return;
+            }
+            respondFile(unescape(dpath), request, response, false);
+          });
+        }
+
+
+        function handleDistFile() {
+          var rpath = path.replace(/^\/+/, '');
+          var dpath = _path.join(instance.config.distdir, rpath);
+
+          console.log('rpath: ' + rpath);
+          console.log('dpath: ' + dpath);
+
+          // Checks if the request was a package resource
+          var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
+          if (pmatch && pmatch.length === 3) {
+            instance.handler.checkPackagePrivilege(request, response, pmatch[1], function (err) {
+              if (err) {
+                respondError(err, response);
+                return;
+              }
+              console.log('..pmatch..');
+
+              respondFile(unescape(dpath), request, response, true);
+            });
+            return;
+          }
+
+          console.log('..else..');
+          // Everything else
+          respondFile(unescape(dpath), request, response, true);
+        }
+
+
+        if (request.method() === 'POST') {
+          if (isVfsCall) {
+            if (relPath === 'upload') {
+              handleUpload();
+            } else {
+              handleCall(true);
+            }
+          } else {
+            handleCall(false);
+          }
+        } else {
+          if (isVfsCall) {
+            handleVFSFile();
+          } else { // dist files
+            handleDistFile();
+          }
+        }
+
+      });
+
+    }
+
+    vertx.createHttpServer().requestHandler(router.accept).listen(8000);
+
+
+    _eb.consumer('OSjsCallXHR', function (message) {
+
+      var msg = message.body();     //  {url:url, args:args, options:options}
+      var pair = msg.url.substring(1).split('/');
+      var call = pair[0];
+      var method = pair[1];
+      if (DEBUG) {
+        console.log('calling: ' + call + ' method: ' + method);
+        //console.log(JSON.stringify(msg.args));
+      }
+      if (call === 'API') API[method](msg.args, message);
+      if (call === 'FS')  VFS[method](msg.args, message);
+    });
+
+
+
+    _eb.consumer('OSjsCallPOST', function (message) {
+      console.log('OSjsCallPOST');
+
+      var mes = message.body();
+      var paths = OSjs.VFS.getRealPath(mes.args.path);
+
+      _fs.writeFile(paths.full, function (result, error) {
+        if (error) message.reply(false);
+        else message.reply(true);
+      });
+    });
+
+
+
+    _eb.consumer('OSjsCallGET', function (message) {
+      console.log('OSjsCallGET');
+
+      var mes = message.body();
+      var paths = OSjs.VFS.getRealPath(mes.args.path);
+
+      _fs.readFile(paths.full, function (result, error) {
+        if (error == null) {
+          if (DEBUG) console.log('callGet ' + paths.path);
+          message.reply(result.toString("UTF-8"));
+        } else {
+          console.log('fs error');
+          console.log(JSON.stringify(error));
+        }
+      })
+    });
+
+  }
+
+  /******************************************/
+
+
+  module.exports.listen = function(setup) {
+    instance = _osjs.init(setup);
+    //server = _http.createServer(httpCall);
+
+    console.log('starting server');
+
+    startServer();
+
+    setTimeout(function(){
+      console.log('***');
+      console.log('*** OS.js vertx is listening on port ' + setup.port);
+      console.log('***');
+    }, 10);
+
+  };
+
+  module.exports.close = function(cb) {
+    cb = cb || function() {};
+
+    cb();
+    vertx.close();
+
+  };
+
+
+
+
+})(
+  require("./osjs"),
+  vertx.eventBus(),
+  vertx.fileSystem(),
+  require("vertx-web-js/router"),
+  require("vertx-web-js/sock_js_handler"),
+  require("vertx-web-js/static_handler"),
+  require("vertx-web-js/cookie_handler"),
+  require("vertx-web-js/cookie"),
+  require("./path")
+);

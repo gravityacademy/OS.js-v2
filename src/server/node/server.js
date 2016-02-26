@@ -51,13 +51,16 @@
   process.on('exit', function() {
     _server.close();
   });
-
-  _server.listen({
+  var conf = {
     port: null,
     dirname: __dirname,
     root: ROOT,
     dist: DIST,
     logging: true,
     nw: false
-  });
+  };
+
+  console.log(conf);
+
+  _server.listen(conf);
 })(require('path'), require('./http.js'));
