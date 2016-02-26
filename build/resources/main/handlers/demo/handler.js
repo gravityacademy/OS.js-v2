@@ -102,7 +102,7 @@
      */
     DemoHandler.prototype.checkPackagePrivilege = function(routingContext, packageName, callback) {
       console.log(' ***** demo checkPackagePrivilege *****');
-      
+
       this._checkHasSession(routingContext, callback);
     };
 

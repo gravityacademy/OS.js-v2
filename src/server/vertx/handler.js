@@ -123,7 +123,6 @@
   /**
    * Gets the username of currently active user
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    *
    * @method Handler::getUserName()
@@ -137,7 +136,6 @@
   /**
    * Gets the groups of currently active user
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    *
    * @method Handler::getUserGroups()
@@ -155,7 +153,6 @@
   /**
    * Gets the blacklisted packages of active user
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   Function    callback      Callback function => fn(error, result)
    *
@@ -170,7 +167,6 @@
   /**
    * Sets the user data of active user
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   Object      data          Session data
    * @param   Function    callback      Callback function => fn(error, result)
@@ -202,7 +198,6 @@
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   Mixed       privilege     Check against given privilege(s)
    * @param   Function    callback      Callback function => fn(err, result)
@@ -230,7 +225,6 @@
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   String      method        VFS Method name
    * @param   Object      args          VFS Method arguments
@@ -259,7 +253,6 @@
    *
    * THIS IS THE METHOD CALLED FROM THE SERVER
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   String      packageName   Name of Package (ex: repo/name)
    * @param   Function    callback      Callback function => fn(err, result)
@@ -303,7 +296,6 @@
   /**
    * Event fired when server gets a login
    *
-   * @param     Object        routingContext       Server routingContext object
    * @param     Object        routingContext      Server routingContext object
    * @param     Object        data          The login data
    * @param     Function      callback      Callback fuction
@@ -343,7 +335,6 @@
   /**
    * Event fired when server gets a logout
    *
-   * @param     Object        routingContext       Server routingContext object
    * @param     Object        routingContext      Server routingContext object
    * @param     Function      callback      Callback fuction
    *
@@ -361,7 +352,6 @@
    *
    * If the user has group 'admin' it will automatically granted full access
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   String      groupname     Group name(s) (can also be an array)
    * @param   Function    callback      Callback function => fn(err, result)
@@ -402,7 +392,6 @@
   /**
    * Default method for checking if user has a session
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   Function    callback      Callback function => fn(err, result)
    *
@@ -421,7 +410,6 @@
   /**
    * Default method for checking blacklisted package permissions
    *
-   * @param   Object      routingContext       Server routingContext object
    * @param   Object      routingContext      Server routingContext object
    * @param   String      packageName   Name of the package
    * @param   Function    callback      Callback function => fn(err, result)

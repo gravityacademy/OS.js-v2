@@ -26,67 +26,119 @@
  *
  * @author  Anders Evenrud <andersevenrud@gmail.com>
  * @licence Simplified BSD License
- *
- * vertx version  -tfs
  */
-(function(_eb, _fs, _Buffer, _Base64) {
+(function(_path, _fs) {
   'use strict';
 
+  function readExif(path, mime, cb) {
+    /*jshint nonew: false */
 
-  function getRealPath(incPath){
-
-    var path, basePath = '', protocol;
-    var upOne = false;
-
-    if ( incPath.match(/^osjs\:\/\//) ) {
-
-      path = incPath.replace(/^osjs\:\/\//, '');
-      basePath = 'dist-dev';
-      protocol = 'osjs://';
-
-    } else if ( incPath.match(/^home\:\/\//) ) {
-
-      path = incPath.replace(/^home\:\/\//, '');
-      basePath = 'vfs/home';
-      protocol = 'home://';
-
-    } else {
-      var tmp = incPath.split(/^(\w+)\:\/\//);
-      if ( tmp.length === 3 ) {
-        tmp = tmp[1];
-        protocol = tmp + '://';
-        basePath = 'vfs/tmp';
-        path = incPath.replace(/^(\w+)\:\/\//, '');
+    if ( mime.match(/^image/) ) {
+      try {
+        var CR = require('exif').ExifImage;
+        new CR({image: path}, function(err, result) {
+          cb(null, JSON.stringify(result, null, 4));
+        });
+        return;
+      } catch ( e ) {
       }
+      return;
     }
 
-    if ( path != '/' ) {
-      var ppcs = path.split('/');
+    cb(false, null);
+  }
 
-      if ( ppcs.length === 2 ) {
+  function readPermission(mode) {
+    var str = '';
+    var map = {
+      0xC000: 's',
+      0xA000: 'l',
+      0x8000: '-',
+      0x6000: 'b',
+      0x4000: 'd',
+      0x1000: 'p'
+    };
 
-        upOne = protocol + '/';
+    var type = 'u';
+    Object.keys(map).forEach(function(k) {
+      if ( (mode & k) === k ) {
+        type = map[k];
+      }
+      return type === 'u';
+    });
 
-      } else if ( ppcs.length > 2 ) {
+    // Owner
+    str += (function() {
+      var ret = ((mode & 0x0100) ? 'r' : '-');
+      ret += ((mode & 0x0080) ? 'w' : '-');
+      ret += ((mode & 0x0040) ? ((mode & 0x0800) ? 's' : 'x' ) : ((mode & 0x0800) ? 'S' : '-'));
+      return ret;
+    })();
 
-        upOne = protocol;
+    // Group
+    str += (function() {
+      var ret = ((mode & 0x0020) ? 'r' : '-');
+      ret += ((mode & 0x0010) ? 'w' : '-');
+      ret += ((mode & 0x0008) ? ((mode & 0x0400) ? 's' : 'x' ) : ((mode & 0x0400) ? 'S' : '-'));
+      return ret;
+    })();
 
-        for (var i = 1; i < ppcs.length-1; i++) {
+    // World
+    str += (function() {
+      var ret = ((mode & 0x0004) ? 'r' : '-');
+      ret += ((mode & 0x0002) ? 'w' : '-');
+      ret += ((mode & 0x0001) ? ((mode & 0x0200) ? 't' : 'x' ) : ((mode & 0x0200) ? 'T' : '-'));
+      return ret;
+    })();
 
-          upOne += '/' + ppcs[i];
+    return str;
+  }
+
+  function pathJoin() {
+    var s = _path.join.apply(null, arguments);
+    return s.replace(/\\/g, '/');
+  }
+
+  function getRealPath(path, config, routingContext) {
+    var fullPath = null;
+    var protocol = '';
+
+    if ( path.match(/^osjs\:\/\//) ) {
+
+      path = path.replace(/^osjs\:\/\//, '');
+      fullPath = _path.join(config.distdir, path);
+      protocol = 'osjs://';
+
+    } else if ( path.match(/^home\:\/\//) ) {
+
+      path = path.replace(/^home\:\/\//, '');
+
+      var userdir = routingContext.getCookie('username').getValue();
+
+      if ( !userdir ) {
+        throw 'No user session was found';
+      }
+      console.log(' ***** user session ' + userdir + ' found *****');
+      fullPath = _path.join(config.vfs.homes, userdir, path);
+      protocol = 'home://';
+    } else {
+      var tmp = path.split(/^(\w+)\:\/\//);
+      if ( tmp.length === 3 ) {
+        tmp = tmp[1];
+        if ( config.vfs.mounts && config.vfs.mounts[tmp] ) {
+          protocol = tmp + '://';
+          path = path.replace(/^(\w+)\:\/\//, '');
+          fullPath = _path.join(config.vfs.mounts[tmp], path);
         }
       }
     }
 
-    if (DEBUG) {
-      console.log('upOne: ' + upOne);
-      console.log('path: ' + path);
-      console.log('full path: ' + basePath + path);
+    if ( !fullPath ) {
+      throw new Error('Invalid mountpoint');
     }
 
-    return {basePath:basePath, path:path, full: basePath+path, upOne:upOne};
+    return {root: fullPath, path: path, protocol: protocol};
   }
-
 
   function getMime(file, config) {
     var i = file.lastIndexOf('.'),
@@ -95,84 +147,431 @@
     return mimeTypes[ext.toLowerCase()] || mimeTypes.default;
   }
 
+  /////////////////////////////////////////////////////////////////////////////
+  // EXPORTS
+  /////////////////////////////////////////////////////////////////////////////
 
+  /**
+   * Get real filesystem path
+   *
+   * NOT AVAILABLE FROM CLIENT
+   *
+   * @param   String    file        File path
+   * @param   Object    config      Server configuration object
+   *
+   * @return  Object                With `root` (real path), `path` (virtual path), `protocol` (virtual protocol)
+   *
+   * @api     vfs.getRealPath
+   */
   module.exports.getRealPath = getRealPath;
 
+  /**
+   * Get file MIME
+   *
+   * NOT AVAILABLE FROM CLIENT
+   *
+   * @param   String    file        File path
+   * @param   Object    config      Server configuration object
+   *
+   * @return  String
+   *
+   * @api     vfs.getMime
+   */
   module.exports.getMime = getMime;
 
-  module.exports.write = function(args, message){
+  /**
+   * Read a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    path      Request path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @option  opts      boolean   raw     Return raw/binary data (default=false)
+   *
+   * @return  void
+   *
+   * @api     vfs.read
+   */
+  module.exports.read = function(args, routingContext, callback, config) {
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
 
-    console.log('VFS.write');
-
-    var paths = getRealPath(args.path);
-    var data = args.data;
-
-
-    if ( args.opts && args.opts.raw ) {
-
-      console.log('trying to write raw... ');
-
-
-    } else {
-
-      data = decodeURI(data.substring(data.indexOf(',') + 1));
-      data = new Buffer.buffer(Base64.decode(data));
-
-      _fs.writeFile(paths.full, data, function(data, error) {
-
-        if ( error ) {
-          console.log('Error writing file: ' + error);
-          message.reply( {result:false, error:true} );
-
-        } else {
-          message.reply( {result:true, error:false} );
-
-        }
-      });
-    }
-
-  };
-
-  module.exports.write = function(args, message) {
-
-  };
-  module.exports.delete = function(args, message) {
-
-  };
-  module.exports.copy = function(args, message) {
-
-  };
-  module.exports.upload = function(args, message) {
-
-  };
-  module.exports.move = function(args, message) {
-
-  };
-  module.exports.mkdir = function(args, message) {
-
-  };
-
-
-  module.exports.exists = function(args, message) {
-
-    var paths = getRealPath(args.path);
-
-    console.log('VFS.exists: ' + paths.full);
-
-    _fs.exists(paths.full, function(result) {
-
-      console.log(JSON.stringify(result));
-      message.reply(result);
+    _fs.exists(realPath.root, function(exists) {
+      if ( exists ) {
+        _fs.readFile(realPath.root, function(error, data) {
+          if ( error ) {
+            callback('Error reading file: ' + error);
+          } else {
+            if ( opts.raw ) {
+              callback(false, data);
+            } else {
+              data = 'data:' + getMime(realPath.root, config) + ';base64,' + (new Buffer(data).toString('base64'));
+              callback(false, data.toString());
+            }
+          }
+        });
+      } else {
+        callback('File not found!');
+      }
     });
   };
 
+  /**
+   * Write a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    path      Request path
+   * @option  args      Mixed     data      Request payload
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @option  opts      boolean   raw     Write raw/binary data (default=false)
+   *
+   * @return  void
+   *
+   * @api     vfs.write
+   */
+  module.exports.write = function(args, routingContext, callback, config) {
+    var data = args.data || '';
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
 
-  module.exports.fileinfo = function(args, message) {
+    if ( opts.raw ) {
+      _fs.writeFile(realPath.root, data, 'binary', function(error, data) {
+        if ( error ) {
+          callback('Error writing file: ' + error);
+        } else {
+          callback(false, true);
+        }
+      });
+    } else {
+      data = unescape(data.substring(data.indexOf(',') + 1));
+      data = new Buffer(data, 'base64');
 
+      _fs.writeFile(realPath.root, data, function(error, data) {
+        if ( error ) {
+          callback('Error writing file: ' + error);
+        } else {
+          callback(false, true);
+        }
+      });
+    }
   };
 
+  /**
+   * Delete a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    path      Request path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.delete
+   */
+  module.exports.delete = function(args, routingContext, callback, config) {
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
 
-  module.exports.scandir = function(args, message) {
+    _fs.exists(realPath.root, function(exists) {
+      if ( !exists ) {
+        callback('Target does not exist!');
+      } else {
+        _fs.remove(realPath.root, function(error, data) {
+          if ( error ) {
+            callback('Error deleting: ' + error);
+          } else {
+            callback(false, true);
+          }
+        });
+      }
+    });
+  };
+
+  /**
+   * Copy a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      String    dest      Request destination path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.copy
+   */
+  module.exports.copy = function(args, routingContext, callback, config) {
+    var src  = args.src;
+    var dst  = args.dest;
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+
+    var realSrc = getRealPath(src, config, routingContext);
+    var realDst = getRealPath(dst, config, routingContext);
+    var srcPath = realSrc.root; //_path.join(realSrc.root, src);
+    var dstPath = realDst.root; //_path.join(realDst.root, dst);
+    _fs.exists(srcPath, function(exists) {
+      if ( exists ) {
+        _fs.exists(dstPath, function(exists) {
+          if ( exists ) {
+            callback('Target already exist!');
+          } else {
+            _fs.copy(srcPath, dstPath, function(error, data) {
+              if ( error ) {
+                callback('Error copying: ' + error);
+              } else {
+                callback(false, true);
+              }
+            });
+          }
+        });
+      } else {
+        callback('Source does not exist!');
+      }
+    });
+  };
+
+  /**
+   * Uploads a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src         Uploaded file path
+   * @option  args      String    name        Destination filename
+   * @option  args      String    path        Destination path
+   * @option  args      boolean   overwrite   Overwrite (default=false)
+   *
+   * @return  void
+   *
+   * @api     vfs.upload
+   */
+  module.exports.upload = function(args, routingContext, callback, config) {
+    var tmpPath = (args.path + '/' + args.name).replace('////', '///'); // FIXME
+    var dstPath = getRealPath(tmpPath, config, routingContext).root;
+    var overwrite = args.overwrite === true;
+
+    _fs.exists(args.src, function(exists) {
+      if ( exists ) {
+        _fs.exists(dstPath, function(exists) {
+          if ( exists && !overwrite ) {
+            callback('Target already exist!');
+          } else {
+            _fs.rename(args.src, dstPath, function(error, data) {
+              if ( error ) {
+                callback('Error renaming/moving: ' + error);
+              } else {
+                callback(false, '1');
+              }
+            });
+          }
+        });
+      } else {
+        callback('Source does not exist!');
+      }
+    });
+  };
+
+  /**
+   * Move a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      String    dest      Request destination path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.move
+   */
+  module.exports.move = function(args, routingContext, callback, config) {
+    var src  = args.src;
+    var dst  = args.dest;
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+
+    var realSrc = getRealPath(src, config, routingContext);
+    var realDst = getRealPath(dst, config, routingContext);
+    var srcPath = realSrc.root; //_path.join(realSrc.root, src);
+    var dstPath = realDst.root; //_path.join(realDst.root, dst);
+    _fs.exists(srcPath, function(exists) {
+      if ( exists ) {
+        _fs.exists(dstPath, function(exists) {
+          if ( exists ) {
+            callback('Target already exist!');
+          } else {
+            _fs.rename(srcPath, dstPath, function(error, data) {
+              if ( error ) {
+                callback('Error renaming/moving: ' + error);
+              } else {
+                callback(false, true);
+              }
+            });
+          }
+        });
+      } else {
+        callback('Source does not exist!');
+      }
+    });
+  };
+
+  /**
+   * Creates a directory
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.mkdir
+   */
+  module.exports.mkdir = function(args, routingContext, callback, config) {
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
+
+    _fs.exists(realPath.root, function(exists) {
+      if ( exists ) {
+        callback('Target already exist!');
+      } else {
+        _fs.mkdir(realPath.root, function(error, data) {
+          if ( error ) {
+            callback('Error creating directory: ' + error);
+          } else {
+            callback(false, true);
+          }
+        });
+      }
+    });
+  };
+
+  /**
+   * Check if file exists
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.exists
+   */
+  module.exports.exists = function(args, routingContext, callback, config) {
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    _fs.exists(realPath.root, function(exists) {
+      callback(false, exists);
+    });
+  };
+
+  /**
+   * Get metadata about a file
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    request     Server request object
+   * @param   Object    response    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.fileinfo
+   */
+  module.exports.fileinfo = function(args, routingContext, callback, config) {
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
+    _fs.exists(realPath.root, function(exists) {
+      if ( !exists ) {
+        callback('No such file or directory!');
+      } else {
+        _fs.stat(realPath.root, function(error, stat) {
+          if ( error ) {
+            callback('Error getting file information: ' + error);
+          } else {
+
+            var mime = getMime(realPath.root, config);
+            var data = {
+              path:         realPath.protocol + realPath.path,
+              filename:     _path.basename(realPath.root),
+              size:         stat.size,
+              mime:         mime,
+              permissions:  readPermission(stat.mode),
+              ctime:        stat.ctime || null,
+              mtime:        stat.mtime || null
+            };
+
+            readExif(realPath.root, mime, function(error, result) {
+              if ( !error && result ) {
+                data.exif = result || error || 'No EXIF data available';
+              }
+              callback(result ? null : error, data);
+            });
+
+          }
+        });
+      }
+    });
+  };
+
+  /**
+   * Scans given directory
+   *
+   * @param   Object    args        API Call Arguments
+   * @param   Function  callback    Callback function => fn(error, result)
+   * @param   Object    routingContext    Server response object
+   * @param   Object    config      Server configuration object
+   *
+   * @option  args      String    src       Request source path
+   * @option  args      Object    options   (Optional) Request options
+   *
+   * @return  void
+   *
+   * @api     vfs.scandir
+   */
+
+  //module.exports.scandir = function(args, message) {
+  module.exports.scandir = function(args, routingContext, callback, config) {
 
     var fileProps = [];
     var fileCounter = 0;
@@ -180,12 +579,13 @@
 
     console.log('VFS.scandir: ' + paths.full);
 
-    _fs.readDir(paths.full, function(res, err) {
+    fs.readDir(paths.full, function(res, err) {
 
       if (err) {
 
         console.log('file scanning error');
         console.log(err);
+        callback(err);
 
       } else {
 
@@ -217,7 +617,7 @@
           getProps(fArray[i], fArray.length);
         }
       } else {
-        message.reply(fileProps);
+        callback(false, fileProps);
       }
     }
 
@@ -229,14 +629,14 @@
       var path;
       var ftype, fsize, ctime, mtime;
 
-      _fs.props(filePath, function (res, err) {
+      fs.props(filePath, function (res, err) {
 
         if (err) {
 
           console.log('file props error');
           console.log(err);
           fileCounter++;
-          if (fileCounter === last) message.reply(fileProps);
+          if (fileCounter === last) callback(false, fileProps);
 
         } else {
 
@@ -274,7 +674,7 @@
           });
 
           fileCounter++;
-          if (fileCounter === last) message.reply(fileProps);
+          if (fileCounter === last) callback(false, fileProps);
         }
       });
     }
@@ -282,8 +682,6 @@
   };
 
 })(
-  vertx.eventBus(),
-  vertx.fileSystem(),
-  require("vertx-js/buffer"),
-  require("./base64")
+  require('./path'),
+  vertx.fileSystem()
 );

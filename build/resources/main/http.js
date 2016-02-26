@@ -50,8 +50,8 @@
     } else {
       console.log('not pipeFile');
 
-      routingContext.response().write(data);
-      done();
+      routingContext.response().end(data);
+      //done();
     }
   }
 
@@ -66,20 +66,22 @@
         try {
 
 
-
           var paths = OSjs.VFS.getRealPath(path);
+
           if (DEBUG) console.log('http FS get ' + paths.path);
+
           routingContext.sendFile(paths.full);
 
           //require('routingContext')(path).pipe(routingContext);
 
 
         } catch ( e ) {
-          console.error('!!! Caught exception', e);
+          console.error('!!! respondFile Caught exception' + e);
           console.warn(e.stack);
           respondError(e, routingContext);
         }
       } else {
+        console.log('VFS Proxy is disabled');
         respondError('VFS Proxy is disabled', routingContext);
       }
       return;
@@ -102,7 +104,7 @@
         }
       });
     } catch ( e ) {
-      console.error('!!! Caught exception', e);
+      console.error('!!! respondFile2 Caught exception', e);
       console.warn(e.stack);
       respondError(e, routingContext, true);
     }
@@ -172,186 +174,175 @@
       "inboundPermitteds" :  [{ "setAddressRegex" : "/^OSjs/" }]};
     router.route("/eventbus/*").handler(SockJSHandler.create(vertx).bridge(options).handle);
 
-    if (ONBUS) {
 
-      router.route('GET', "/FS/get/*").handler(function (rc) {
-        var path = rc.routingContext().path().replace('/FS/get/', '');
-        var paths = OSjs.VFS.getRealPath(path);
-        if (DEBUG) console.log('http FS get ' + paths.path);
-        rc.routingContext().sendFile(paths.full);
-      });
-      router.route().handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("dist-dev").handle);
+    router.route().handler(CookieHandler.create().handle);
+    router.route().handler(function (routingContext) {
 
-    } else {
+      var path = routingContext.request().path();
 
+      // cookies
 
-      router.route().handler(CookieHandler.create().handle);
-      router.route().handler(function (routingContext) {
+      if (path === '/') {
+        path += 'index.html';
+      }
 
-        var path = routingContext.request().path();
+      /*if ( instance.config.logging ) {
+       log(timestamp(), '<<<', path);
+       }*/
 
-        // cookies
+      if (instance.handler && instance.handler.onRequestStart) {
+        instance.handler.onRequestStart(routingContext);
+      }
 
-        if (path === '/') {
-          path += 'index.html';
-        }
-
-        /*if ( instance.config.logging ) {
-         log(timestamp(), '<<<', path);
-         }*/
-
-        if (instance.handler && instance.handler.onRequestStart) {
-          instance.handler.onRequestStart(routingContext);
-        }
-
-        var isVfsCall = path.match(/^\/FS/) !== null;
-        var relPath = path.replace(/^\/(FS|API)\/?/, '');
+      var isVfsCall = path.match(/^\/FS/) !== null;
+      var relPath = path.replace(/^\/(FS|API)\/?/, '');
 
 
-        console.log(routingContext.request().method());
-        console.log('-=-=-=- isVfsCall: ' + isVfsCall);
-        console.log('-=-=-=- relPath: ' + relPath);
+      console.log(routingContext.request().method());
+      console.log('-=-=-=- isVfsCall: ' + isVfsCall);
+      console.log('-=-=-=- relPath: ' + relPath);
 
 
-        function handleCall(isVfs) {
+      function handleCall(isVfs) {
 
-          console.log('handleCall');
-          console.log('handleCall');
-          console.log('handleCall');
-          console.log('handleCall');
-          console.log('handleCall');
-          console.log(path);
-
-
-          //routingContext.on('data', function(data) {
-          //  body += data;
-          //});
-
-          //routingContext.on('end', function() {
-
-          routingContext.request().bodyHandler(function (body) {
-
-            try {
-
-              var args = JSON.parse(body);
-
-              console.log(JSON.stringify(args));
-
-              instance.request(isVfs, relPath, args, function (error, result) {
-
-                console.log('--req resulting---');
-
-                respondJSON({result: result, error: error}, routingContext);
-
-              }, routingContext, instance.handler);
-
-            } catch (e) {
-
-              console.error('!!! Caught exception', e);
-              console.warn(e.stack);
-              //respondError(e, routingContext, true);
-
-            }
-          });
-
-        }
+        console.log('handleCall');
+        console.log('handleCall');
+        console.log('handleCall');
+        console.log('handleCall');
+        console.log('handleCall');
+        console.log(path);
 
 
-        function handleUpload() {
-          var form = new _multipart.IncomingForm({
-            uploadDir: instance.config.tmpdir
-          });
+        //routingContext.on('data', function(data) {
+        //  body += data;
+        //});
 
-          form.parse(routingContext, function (err, fields, files) {
-            if (err) {
-              if (instance.config.logging) {
-                respondError(err, routingContext);
-              }
-            } else {
-              instance.handler.checkAPIPrivilege(routingContext, 'upload', function (err) {
-                if (err) {
-                  respondError(err, routingContext);
-                  return;
-                }
+        //routingContext.on('end', function() {
 
-                instance.vfs.upload({
-                  src: files.upload.path,
-                  name: files.upload.name,
-                  path: fields.path,
-                  overwrite: String(fields.overwrite) === 'true'
-                }, function (err, result) {
-                  if (err) {
-                    respondError(err, routingContext);
-                    return;
-                  }
-                  respondText(routingContext, '1');
-                }, routingContext);
-              });
-            }
-          });
-        }
+        routingContext.request().bodyHandler(function (body) {
 
-        function handleVFSFile() {
-          var dpath = path.replace(/^\/(FS|API)(\/get\/)?/, '');
-          instance.handler.checkAPIPrivilege(routingContext, 'fs', function (err) {
-            if (err) {
+          try {
+
+            var args = JSON.parse(body);
+
+            console.log(JSON.stringify(args));
+
+            instance.request(isVfs, relPath, args, function (error, result) {
+
+              console.log('--req resulting---');
+
+              respondJSON({result: result, error: error}, routingContext);
+
+            }, routingContext, instance.handler);
+
+          } catch (e) {
+
+            console.error('!!! handleCall Caught exception:');
+            console.error(e);
+
+            //respondError(e, routingContext, true);
+
+          }
+        });
+
+      }
+
+
+      function handleUpload() {
+        var form = new _multipart.IncomingForm({
+          uploadDir: instance.config.tmpdir
+        });
+
+        form.parse(routingContext, function (err, fields, files) {
+          if (err) {
+            if (instance.config.logging) {
               respondError(err, routingContext);
-              return;
             }
-            respondFile(unescape(dpath), routingContext, false);
-          });
-        }
-
-
-        function handleDistFile() {
-          var rpath = path.replace(/^\/+/, '');
-          var dpath = _path.join(instance.config.distdir, rpath);
-
-          console.log('rpath: ' + rpath);
-          console.log('dpath: ' + dpath);
-
-          // Checks if the routingContext was a package resource
-          var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
-          if (pmatch && pmatch.length === 3) {
-            instance.handler.checkPackagePrivilege(routingContext, pmatch[1], function (err) {
+          } else {
+            instance.handler.checkAPIPrivilege(routingContext, 'upload', function (err) {
               if (err) {
                 respondError(err, routingContext);
                 return;
               }
-              console.log('..pmatch..');
 
-              respondFile(unescape(dpath), routingContext, true);
+              instance.vfs.upload({
+                src: files.upload.path,
+                name: files.upload.name,
+                path: fields.path,
+                overwrite: String(fields.overwrite) === 'true'
+              }, function (err, result) {
+                if (err) {
+                  respondError(err, routingContext);
+                  return;
+                }
+                respondText(routingContext, '1');
+              }, routingContext);
             });
+          }
+        });
+      }
+
+      function handleVFSFile() {
+        var dpath = path.replace(/^\/(FS|API)(\/get\/)?/, '');
+        instance.handler.checkAPIPrivilege(routingContext, 'fs', function (err) {
+          if (err) {
+            respondError(err, routingContext);
             return;
           }
+          respondFile(unescape(dpath), routingContext, false);
+        });
+      }
 
-          console.log('..else..');
-          // Everything else
-          respondFile(unescape(dpath), routingContext, true);
+
+      function handleDistFile() {
+        var rpath = path.replace(/^\/+/, '');
+        var dpath = _path.join(instance.config.distdir, rpath);
+
+        console.log('rpath: ' + rpath);
+        console.log('dpath: ' + dpath);
+
+        // Checks if the routingContext was a package resource
+        var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
+        if (pmatch && pmatch.length === 3) {
+          instance.handler.checkPackagePrivilege(routingContext, pmatch[1], function (err) {
+            if (err) {
+              respondError(err, routingContext);
+              return;
+            }
+            console.log('..pmatch..');
+
+            respondFile(unescape(dpath), routingContext, true);
+          });
+          return;
         }
 
+        console.log('..else..');
+        // Everything else
+        respondFile(unescape(dpath), routingContext, true);
+      }
 
-        if (routingContext.request().method() === 'POST') {
-          if (isVfsCall) {
-            if (relPath === 'upload') {
-              handleUpload();
-            } else {
-              handleCall(true);
-            }
+
+      if (routingContext.request().method() === 'POST') {
+        if (isVfsCall) {
+          if (relPath === 'upload') {
+            handleUpload();
           } else {
-            handleCall(false);
+            handleCall(true);
           }
         } else {
-          if (isVfsCall) {
-            handleVFSFile();
-          } else { // dist files
-            handleDistFile();
-          }
+          handleCall(false);
         }
+      } else {
+        if (isVfsCall) {
+          handleVFSFile();
+        } else { // dist files
+          handleDistFile();
+        }
+      }
 
-      });
+    });
 
-    }
+
 
     vertx.createHttpServer().requestHandler(router.accept).listen(8000);
 

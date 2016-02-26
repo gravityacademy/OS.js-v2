@@ -23,8 +23,6 @@
     "src/client/dialogs.html": "dist/dialogs.html"
   },
   "javascript": [
-    "src/client/javascript/utils/sockjs.js",
-    "src/client/javascript/utils/vertx-eventbus.js",
     "src/client/javascript/init.js",
     "src/client/javascript/utils/compability.js",
     "src/client/javascript/utils/misc.js",

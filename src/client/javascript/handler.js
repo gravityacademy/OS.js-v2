@@ -35,7 +35,7 @@
   OSjs.Core     = OSjs.Core     || {};
 
   var _handlerInstance;
-  var EBUS = true;
+  var EBUS = false;
 
   /////////////////////////////////////////////////////////////////////////////
   // DEFAULT HANDLING CODE
