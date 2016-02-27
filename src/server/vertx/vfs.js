@@ -137,6 +137,9 @@
       throw new Error('Invalid mountpoint');
     }
 
+    if (path.substr(0,1) === '/') path = path.substr(1);
+    if (fullPath.substr(0,1) === '/') fullPath = fullPath.substr(1);
+
     return {root: fullPath, path: path, protocol: protocol};
   }
 
@@ -518,6 +521,7 @@
    * @api     vfs.fileinfo
    */
   module.exports.fileinfo = function(args, routingContext, callback, config) {
+
     var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
     var realPath = getRealPath(args.path, config, routingContext);
     var path = realPath.path;
@@ -569,116 +573,75 @@
    *
    * @api     vfs.scandir
    */
-
-  //module.exports.scandir = function(args, message) {
   module.exports.scandir = function(args, routingContext, callback, config) {
+    var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+    var realPath = getRealPath(args.path, config, routingContext);
+    var path = realPath.path;
 
-    var fileProps = [];
-    var fileCounter = 0;
-    var paths = getRealPath(args.path);
+    _fs.readDir(realPath.root, function(files, error) {
 
-    console.log('VFS.scandir: ' + paths.full);
-
-    fs.readDir(paths.full, function(res, err) {
-
-      if (err) {
-
-        console.log('file scanning error');
-        console.log(err);
-        callback(err);
+      if ( error ) {
+        callback('Error reading directory: ' + error);
 
       } else {
+        var result = [];
+        var ofpath, fpath, fprops, ftype, fsize, ctime, mtime;
 
-        //console.log(res);
-        nextStep(res);
-      }
+        var tmp = realPath.path.replace(/^\/+?/, '');
 
-    });
+        if (tmp.length && tmp.split('/').length) {
+          tmp = tmp.split('/');
+          tmp.pop();
+          tmp = tmp.join('/');
 
-    function nextStep(fArray) {
-
-      fileProps = [];
-      fileCounter = 0;
-
-      if (paths.upOne) {
-        fileProps.push({
-          ctime: null,
-          filename: "..",
-          mime: "",
-          mtime: null,
-          path: paths.upOne,
-          size: 0,
-          type: "dir"
-        });
-      }
-
-      if (fArray.length > 0) {
-        for (var i = 0; i < fArray.length; i++) {
-          getProps(fArray[i], fArray.length);
+          result.push({
+            filename: '..',
+            path: realPath.protocol + _path.join('/', tmp),
+            size: 0,
+            mime: '',
+            type: 'dir',
+            ctime: null,
+            mtime: null
+          });
         }
-      } else {
-        callback(false, fileProps);
-      }
-    }
 
-    function getProps(filePath, last) {
+        for (var i = 0; i < files.length; i++) {
 
-      var ppcs = filePath.substring(1).split('/');
-      var filename = ppcs[ppcs.length - 1];
-      var type = "file";
-      var path;
-      var ftype, fsize, ctime, mtime;
+          var pccs = files[i].split('/');
+          var file = pccs[pccs.length - 1];
 
-      fs.props(filePath, function (res, err) {
-
-        if (err) {
-
-          console.log('file props error');
-          console.log(err);
-          fileCounter++;
-          if (fileCounter === last) callback(false, fileProps);
-
-        } else {
-
-          //console.log(filename);
-
-          if (res.isRegularFile()) ftype = "text/plain";
-          if (res.isDirectory()) type = "dir";
-
-          if (args.path.substr(args.path.length - 1, 1) === '/') {
-            path = args.path + filename;
-          } else {
-            path = args.path + '/' + filename;
-          }
+          ofpath = pathJoin(path, file);
+          fpath = _path.join(realPath.root, file);
 
           try {
-            ftype  = res.isRegularFile() ? 'file' : 'dir';
-            fsize  = res.size;
-            ctime  = res.creationTime();
-            mtime  = res.lastModifiedTime();
-          } catch ( e ) {
+            fprops = _fs.propsBlocking(fpath);
+            ftype = fprops.isDirectory() ? 'dir' : 'file';
+            fsize = fprops.size;
+            mtime = fprops.lastModifiedTime();
+            ctime = fprops.creationTime();
+
+          } catch (e) {
+
             ftype = 'file';
             fsize = 0;
             ctime = null;
             mtime = null;
           }
 
-          fileProps.push( {
-            filename: filename,
-            path: path,
+          result.push({
+            filename: file,
+            path: realPath.protocol + ofpath,
             size: fsize,
-            mime: ftype === 'file' ? getMime(filename, config) : '',
+            mime: ftype === 'file' ? getMime(files[i], config) : '',
             type: ftype,
             ctime: ctime,
             mtime: mtime
           });
-
-          fileCounter++;
-          if (fileCounter === last) callback(false, fileProps);
         }
-      });
-    }
 
+        callback(false, result);
+      }
+    });
   };
 
 })(

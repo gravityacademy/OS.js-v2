@@ -132,8 +132,6 @@
       setup.distdir = setup.root;
     }
 
-    console.log(JSON.stringify(setup));
-
     console.log('osjs.ini2');
 
     // Register manifest
@@ -145,8 +143,6 @@
     config = require('./config.js').init(setup);
 
     console.log('osjs.ini4');
-
-    global.DEBUG = true;
 
 
     // Public namespace

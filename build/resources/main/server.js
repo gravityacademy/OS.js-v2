@@ -38,6 +38,8 @@
     root: "",
     dist: "dist-dev",
     logging: true,
+    verbose: false,
+    verboseAuth: false,
     nw: false
   });
 

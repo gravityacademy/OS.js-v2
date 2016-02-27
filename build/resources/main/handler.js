@@ -27,11 +27,13 @@
  * @author  Anders Evenrud <andersevenrud@gmail.com>
  * @licence Simplified BSD License
  */
-(function(_path) {
+(function(_path, Cookie) {
   'use strict';
 
   var ignorePrivilegesAPI = ['login'];
   var ignorePrivilegesVFS = ['getMime', 'getRealPath'];
+
+  var verboseAuth;
 
   /**
    * Internal for registering a API method. This wraps the methods so that
@@ -61,8 +63,10 @@
    * privilege checks etc are performed
    */
   function registerVFSMethod(handler, instance, fn, fref) {
+
     if ( !instance.vfs[fn] ) {
       if ( ignorePrivilegesVFS.indexOf(fn) < 0 ) {
+
         instance.vfs[fn] = function(args, callback, routingContext) {
           handler.checkAPIPrivilege(routingContext, 'fs', function(err) {
             if ( err ) {
@@ -128,9 +132,10 @@
    * @method Handler::getUserName()
    */
   DefaultHandler.prototype.getUserName = function(routingContext) {
-    console.log(' ******* getUserName *******');
-    //return routingContext.cookies.get('username');
-    return routingContext.getCookie('username');
+    if (verboseAuth) console.log(' ******* getUserName *******');
+
+    return 'demo';
+    //return routingContext.getCookie('username').getValue();
   };
 
   /**
@@ -141,9 +146,12 @@
    * @method Handler::getUserGroups()
    */
   DefaultHandler.prototype.getUserGroups = function(routingContext) {
+    if (verboseAuth) console.log(' ******* getUserGroups ************************************');
+
     var groups = [];
     try {
-      groups = JSON.parse(routingContext.getCookie('groups'));
+      groups = ["admin"];
+      //groups = JSON.parse(routingContext.getCookie('groups').getValue()); //todo decodeurl
     } catch ( e ) {
       groups = [];
     }
@@ -177,17 +185,24 @@
    */
   DefaultHandler.prototype.setUserData = function(routingContext, data, callback) {
 
-    console.log('setUserData');
-    console.log(JSON.stringify(data));
+    if (verboseAuth) {
+      console.log('setUserData');
+      console.log(JSON.stringify(data));
+    }
 
     if ( data === null ) {
-      console.log('++++ setting null cookies ++++');
-      //routingContext.cookies.set('username', null, {httpOnly:true});
-      //routingContext.cookies.set('groups', null, {httpOnly:true});
+
+      if (verboseAuth) console.log('++++ setting null cookies ++++');
+
+      routingContext.addCookie(Cookie.cookie('username', null));
+      routingContext.addCookie(Cookie.cookie('groups', null));
     } else {
-      console.log('++++ setting cookies ++++');
-      //routingContext.cookies.set('username', data.username, {httpOnly:true});
-      //routingContext.cookies.set('groups', JSON.stringify(data.groups), {httpOnly:true});
+      if (verboseAuth) {
+        console.log('++++ setting cookies ++++');
+        console.log(JSON.stringify(data.groups));
+      }
+      routingContext.addCookie(Cookie.cookie('username', data.username));
+      routingContext.addCookie(Cookie.cookie('groups', encodeURI(JSON.stringify(data.groups))));
     }
 
     callback(false, true);
@@ -209,7 +224,8 @@
    */
   DefaultHandler.prototype.checkAPIPrivilege = function(routingContext, privilege, callback) {
 
-    console.log('**checkAPIPrivilege**');
+    if (verboseAuth) console.log('**checkAPIPrivilege**');
+
     var self = this;
     this._checkHasSession(routingContext, function(err) {
       if ( err ) {
@@ -237,7 +253,8 @@
    */
   DefaultHandler.prototype.checkVFSPrivilege = function(routingContext, method, args, callback) {
 
-    console.log('******* checkVFSPrivilege ******');
+    if (verboseAuth) console.log('******* checkVFSPrivilege ******');
+
     var self = this;
     this._checkHasSession(routingContext, function(err) {
       if ( err ) {
@@ -305,7 +322,8 @@
    */
   DefaultHandler.prototype.onLogin = function(routingContext, data, callback) {
 
-    console.log('handler.js onLogin');
+    if (verboseAuth) console.log('handler.js onLogin');
+
     var self = this;
 
     function finished() {
@@ -325,7 +343,7 @@
 
     data.userSettings = data.userSettings || {};
 
-    console.log('userSettings: '+ data.userSettings);
+    if (verboseAuth) console.log('userSettings: '+ data.userSettings);
 
     this.setUserData(routingContext, data.userData, function() {
       finished();
@@ -399,7 +417,8 @@
    * @method Handler::_checkHasSession()
    */
   DefaultHandler.prototype._checkHasSession = function(routingContext, callback) {
-    console.log(' ******  _checkHasSession  ******');
+    if (verboseAuth) console.log(' ******  _checkHasSession  ******');
+
     if ( !this.instance.setup.nw && !this.getUserName(routingContext) ) {
       callback('You have no OS.js Session, please log in!');
       return;
@@ -418,6 +437,8 @@
    * @method Handler::_checkHasBlacklistedPackage()
    */
   DefaultHandler.prototype._checkHasBlacklistedPackage = function(routingContext, packageName, callback) {
+    if (verboseAuth) console.log(' ******  _checkHasBlacklistedPackage  ******');
+
     this.getUserBlacklistedPackages(routingContext, function(error, list) {
       if ( error ) {
         callback(error, false);
@@ -435,6 +456,8 @@
    * @method Handler::_checkHasAPIPrivilege()
    */
   DefaultHandler.prototype._checkHasAPIPrivilege = function(routingContext, privilege, callback) {
+    if (verboseAuth) console.log(' ******  _checkHasAPIPrivilege  ******');
+
     var map = this.instance.config.api.groups;
     if ( map && privilege && map[privilege] ) {
       this._checkHasGroup(routingContext, privilege, function(err, res) {
@@ -460,6 +483,8 @@
    * @method Handler::_checkHasVFSPrivilege()
    */
   DefaultHandler.prototype._checkHasVFSPrivilege = function(routingContext, method, args, callback) {
+    if (verboseAuth) console.log(' ******  _checkHasVFSPrivilege  ******');
+
     var mount = this.instance.vfs.getRealPath(args.path || args.src, this.instance.config, routingContext);
     var cfg = this.instance.config.vfs.groups;
     var against;
@@ -491,6 +516,8 @@
    * @method Handler::_checkHasPackagePrivilege()
    */
   DefaultHandler.prototype._checkHasPackagePrivilege = function(routingContext, packageName, callback) {
+    if (verboseAuth) console.log(' ******  _checkHasPackagePrivilege  ******');
+
     var packages = this.instance.metadata;
     var self = this;
 
@@ -568,6 +595,8 @@
    */
   module.exports.init = function(instance) {
 
+    verboseAuth = instance.config.verboseAuth;
+
     // Register 'handler' API methods
     var handler;
     var hs = _path.join('handlers', instance.config.handler, 'handler.js');
@@ -584,4 +613,7 @@
 
     return handler;
   };
-})(require('./path'));
+})(
+  require('./path'),
+  require("vertx-web-js/cookie")
+);

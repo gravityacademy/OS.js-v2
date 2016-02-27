@@ -1,11 +1,7 @@
 (function(_osjs, _path, _eb, _fs, Router, SockJSHandler, StaticHandler, CookieHandler, Cookie){
   'use strict';
 
-  var instance, server;
-
-  var ONBUS = false;
-  var API = require('./vapi');
-  var VFS = require('./vvfs');
+  var instance;
 
   /////////////////////////////////////////////////////////////////////////////
   // HELPERS
@@ -15,7 +11,7 @@
    * Respond to HTTP Call
    */
   function respond(data, mime, routingContext, headers, code, pipeFile) {
-    console.log('respond');
+    //console.log('respond');
 
 
     if ( instance.config.logging ) {
@@ -37,7 +33,7 @@
     routingContext.response().putHeader('Content-Type', mime);
 
     if ( pipeFile ) {
-      console.log('pipeFile: ' + pipeFile);
+      //console.log('pipeFile: ' + pipeFile);
 
       //var stream = _fs.createReadStream(pipeFile, {bufferSize: 64 * 1024});
       //stream.on('end', done);
@@ -48,7 +44,7 @@
 
 
     } else {
-      console.log('not pipeFile');
+      //console.log('not pipeFile');
 
       routingContext.response().end(data);
       //done();
@@ -59,7 +55,8 @@
    * Respond with a file
    */
   function respondFile(path, routingContext, realPath) {
-    console.log('respondFile');
+
+    if ( instance.config.verbose ) console.log('respondFile o0o0o0o0ooo0o');
 
     if ( !realPath && path.match(/^(ftp|https?)\:\/\//) ) {
       if ( instance.config.vfs.proxy ) {
@@ -68,11 +65,10 @@
 
           var paths = OSjs.VFS.getRealPath(path);
 
-          if (DEBUG) console.log('http FS get ' + paths.path);
+          if ( instance.config.logging ) console.log('http FS get ' + paths.path);
 
           routingContext.sendFile(paths.full);
 
-          //require('routingContext')(path).pipe(routingContext);
 
 
         } catch ( e ) {
@@ -92,10 +88,11 @@
       _fs.exists(fullPath, function(exists) {
         if ( exists ) {
 
-          console.log('it exists');
+          if ( instance.config.verbose ) console.log('it exists');
 
           var mime = instance.vfs.getMime(fullPath, instance.config);
-          console.log('mime: ' +  mime);
+
+          if ( instance.config.verbose ) console.log('mime: ' +  mime);
 
           respond(null, mime, routingContext, [], 200, fullPath);
 
@@ -180,15 +177,13 @@
 
       var path = routingContext.request().path();
 
-      // cookies
-
       if (path === '/') {
         path += 'index.html';
       }
 
-      /*if ( instance.config.logging ) {
+      if ( instance.config.logging ) {
        log(timestamp(), '<<<', path);
-       }*/
+       }
 
       if (instance.handler && instance.handler.onRequestStart) {
         instance.handler.onRequestStart(routingContext);
@@ -197,27 +192,13 @@
       var isVfsCall = path.match(/^\/FS/) !== null;
       var relPath = path.replace(/^\/(FS|API)\/?/, '');
 
-
-      console.log(routingContext.request().method());
-      console.log('-=-=-=- isVfsCall: ' + isVfsCall);
-      console.log('-=-=-=- relPath: ' + relPath);
-
+      if ( instance.config.verbose ) {
+        console.log(routingContext.request().method());
+        console.log('-=-=-=- isVfsCall: ' + isVfsCall);
+        console.log('-=-=-=- relPath: ' + relPath);
+      }
 
       function handleCall(isVfs) {
-
-        console.log('handleCall');
-        console.log('handleCall');
-        console.log('handleCall');
-        console.log('handleCall');
-        console.log('handleCall');
-        console.log(path);
-
-
-        //routingContext.on('data', function(data) {
-        //  body += data;
-        //});
-
-        //routingContext.on('end', function() {
 
         routingContext.request().bodyHandler(function (body) {
 
@@ -225,11 +206,11 @@
 
             var args = JSON.parse(body);
 
-            console.log(JSON.stringify(args));
+            //console.log(JSON.stringify(args));
 
             instance.request(isVfs, relPath, args, function (error, result) {
 
-              console.log('--req resulting---');
+              //console.log('--req resulting---');
 
               respondJSON({result: result, error: error}, routingContext);
 
@@ -237,7 +218,7 @@
 
           } catch (e) {
 
-            console.error('!!! handleCall Caught exception:');
+            console.error('!!! handleCall Caught exception: @#$@$#%@#$%@#$%@#$%@#$%@#$%@#$%@#$%@#$%@#$%');
             console.error(e);
 
             //respondError(e, routingContext, true);
@@ -298,8 +279,8 @@
         var rpath = path.replace(/^\/+/, '');
         var dpath = _path.join(instance.config.distdir, rpath);
 
-        console.log('rpath: ' + rpath);
-        console.log('dpath: ' + dpath);
+        //console.log('rpath: ' + rpath);
+        //console.log('dpath: ' + dpath);
 
         // Checks if the routingContext was a package resource
         var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
@@ -309,14 +290,14 @@
               respondError(err, routingContext);
               return;
             }
-            console.log('..pmatch..');
+            if ( instance.config.verbose ) console.log('..pmatch..');
 
             respondFile(unescape(dpath), routingContext, true);
           });
           return;
         }
 
-        console.log('..else..');
+        if ( instance.config.verbose ) console.log('..else..');
         // Everything else
         respondFile(unescape(dpath), routingContext, true);
       }
@@ -343,7 +324,6 @@
     });
 
 
-
     vertx.createHttpServer().requestHandler(router.accept).listen(8000);
 
 
@@ -353,7 +333,7 @@
       var pair = msg.url.substring(1).split('/');
       var call = pair[0];
       var method = pair[1];
-      if (DEBUG) {
+      if ( instance.config.logging ) {
         console.log('calling: ' + call + ' method: ' + method);
         //console.log(JSON.stringify(msg.args));
       }
@@ -385,7 +365,9 @@
 
       _fs.readFile(paths.full, function (result, error) {
         if (error == null) {
-          if (DEBUG) console.log('callGet ' + paths.path);
+
+          if ( instance.config.logging ) console.log('callGet ' + paths.path);
+
           message.reply(result.toString("UTF-8"));
         } else {
           console.log('fs error');
@@ -401,10 +383,6 @@
 
   module.exports.listen = function(setup) {
     instance = _osjs.init(setup);
-    //server = _http.createServer(httpCall);
-
-    console.log('starting server');
-
     startServer();
 
     instance.handler.onServerStart(function() {
