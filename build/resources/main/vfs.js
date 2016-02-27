@@ -113,7 +113,11 @@
 
       path = path.replace(/^home\:\/\//, '');
 
-      var userdir = routingContext.getCookie('username').getValue();
+      var userdir;
+
+      if (routingContext.getCookie('username')) {
+        userdir = routingContext.getCookie('username').getValue();
+      }
 
       if ( !userdir ) {
         throw 'No user session was found';
@@ -498,7 +502,9 @@
    */
   module.exports.exists = function(args, routingContext, callback, config) {
     var opts = typeof args.options === 'undefined' ? {} : (args.options || {});
+
     var realPath = getRealPath(args.path, config, routingContext);
+
     _fs.exists(realPath.root, function(exists) {
       callback(false, exists);
     });

@@ -45,9 +45,9 @@
       handler.onLogin(routingContext, {
         userData: {
           id: 0,
-          username: 'demo',
-          name: 'Demo User',
-          groups: ['admin']
+          username: "demo",
+          name: "Demo User",
+          groups: ["admin"]
         }
       }, callback);
     },
@@ -80,8 +80,10 @@
      */
     DemoHandler.prototype.checkAPIPrivilege = function(routingContext, privilege, callback) {
       console.log(' ***** demo checkAPIPrivilege *****');
+      console.log(routingContext.request().path());
 
       this._checkHasSession(routingContext, callback);
+
     };
 
     /**

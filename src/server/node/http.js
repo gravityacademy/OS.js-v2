@@ -45,13 +45,26 @@
     }
 
     function done() {
+
+      console.log('++++++++++++++++++++++++++++++++++++++++++');
+      console.log('++++++++    DONE  +++++++++++++++++++++++');
+
       if ( instance.handler && instance.handler.onRequestEnd ) {
+
+        console.log('++++++++    onRequestEnd  +++++++++++++++++++++++');
+
+
         instance.handler.onRequestEnd(null, response);
       }
       response.end();
     }
 
     headers.forEach(function(h) {
+
+      console.log('++++++++++++++++++++++++++++++++++++++++++');
+      console.log('++++++++++++++++++++++++++++++++++++++++++');
+      console.log('++++++++++++++++++++++++++++++++++++++++++');
+      console.log('++++++++++++++++++++++++++++++++++++++++++');
       response.writeHead.apply(response, h);
     });
 

@@ -37,9 +37,9 @@
     dirname: "src/server/vertx/",
     root: "",
     dist: "dist-dev",
-    logging: true,
-    verbose: false,
-    verboseAuth: false,
+    logging: false,
+    verbose: true,
+    verboseAuth: true,
     nw: false
   });
 

@@ -134,8 +134,7 @@
   DefaultHandler.prototype.getUserName = function(routingContext) {
     if (verboseAuth) console.log(' ******* getUserName *******');
 
-    return 'demo';
-    //return routingContext.getCookie('username').getValue();
+    return routingContext.getCookie('username').getValue();
   };
 
   /**
@@ -150,9 +149,13 @@
 
     var groups = [];
     try {
-      groups = ["admin"];
-      //groups = JSON.parse(routingContext.getCookie('groups').getValue()); //todo decodeurl
+      //groups = ["admin"];
+      groups = JSON.parse( decodeURI(routingContext.getCookie('groups').getValue()) );
+
     } catch ( e ) {
+
+      console.log('-=-==- Error decoding groups cookie -===-===-=--=-=-=-=--=-=--=-=-=-=--=');
+      console.log(e);
       groups = [];
     }
     return groups;
@@ -187,22 +190,34 @@
 
     if (verboseAuth) {
       console.log('setUserData');
+      console.log(routingContext.request().path());
       console.log(JSON.stringify(data));
     }
 
+    var uCookie = new Cookie.cookie('username', '');
+    var gCookie = new Cookie.cookie('groups', '');
+
+    uCookie.setPath('/').setHttpOnly(true);
+    gCookie.setPath('/').setHttpOnly(true);
+
     if ( data === null ) {
 
-      if (verboseAuth) console.log('++++ setting null cookies ++++');
+      console.log('++++ setting null cookies ++++');
 
-      routingContext.addCookie(Cookie.cookie('username', null));
-      routingContext.addCookie(Cookie.cookie('groups', null));
+      routingContext.addCookie(uCookie);
+      routingContext.addCookie(gCookie);
+
     } else {
+
       if (verboseAuth) {
         console.log('++++ setting cookies ++++');
         console.log(JSON.stringify(data.groups));
       }
-      routingContext.addCookie(Cookie.cookie('username', data.username));
-      routingContext.addCookie(Cookie.cookie('groups', encodeURI(JSON.stringify(data.groups))));
+      uCookie.setValue(data.username);
+      gCookie.setValue(encodeURI(JSON.stringify(data.groups)));
+
+      routingContext.addCookie(uCookie);
+      routingContext.addCookie(gCookie);
     }
 
     callback(false, true);
@@ -417,6 +432,7 @@
    * @method Handler::_checkHasSession()
    */
   DefaultHandler.prototype._checkHasSession = function(routingContext, callback) {
+
     if (verboseAuth) console.log(' ******  _checkHasSession  ******');
 
     if ( !this.instance.setup.nw && !this.getUserName(routingContext) ) {
@@ -595,7 +611,7 @@
    */
   module.exports.init = function(instance) {
 
-    verboseAuth = instance.config.verboseAuth;
+    verboseAuth = true;
 
     // Register 'handler' API methods
     var handler;

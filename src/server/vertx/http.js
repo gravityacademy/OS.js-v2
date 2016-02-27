@@ -11,8 +11,6 @@
    * Respond to HTTP Call
    */
   function respond(data, mime, routingContext, headers, code, pipeFile) {
-    //console.log('respond');
-
 
     if ( instance.config.logging ) {
       log(timestamp(), '>>>', code, mime, pipeFile || typeof data);
@@ -27,7 +25,10 @@
     }
 
     headers.forEach(function(h) {
-      routingContext.writeHead.apply(routingContext, h);
+
+      console.log('&*&*&*&*&&*&*&*& headers apply &*&*&*&  todo');
+
+      routingContext.response().putHeader.apply(h);
     });
 
     routingContext.response().putHeader('Content-Type', mime);
@@ -87,8 +88,6 @@
       var fullPath = realPath ? path : instance.vfs.getRealPath(path, instance.config, routingContext).root;
       _fs.exists(fullPath, function(exists) {
         if ( exists ) {
-
-          if ( instance.config.verbose ) console.log('it exists');
 
           var mime = instance.vfs.getMime(fullPath, instance.config);
 
@@ -302,6 +301,7 @@
         respondFile(unescape(dpath), routingContext, true);
       }
 
+      /* -= - -= - - -= -= -=- =- =- =- - =- =- =- =-= -= -- =- =- =- =-*/
 
       if (routingContext.request().method() === 'POST') {
         if (isVfsCall) {
