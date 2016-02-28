@@ -7,6 +7,12 @@ node_modules
 twistd.*
 .vagrant/*
 *.pyc
+*.iml
+.idea
+.gradle
+.vertx
+build/resources
+build/tmp
 
 .nightly
 .standalone
