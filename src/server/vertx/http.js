@@ -285,7 +285,7 @@
       function handleDistFile() {
         var rpath = path.replace(/^\/+/, '');
         var dpath = _path.join(instance.config.distdir, rpath);
-        
+
         // Checks if the routingContext was a package resource
         var pmatch = rpath.match(/^packages\/(.*\/.*)\/(.*)/);
         if (pmatch && pmatch.length === 3) {
