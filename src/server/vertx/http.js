@@ -30,10 +30,19 @@
  */
 /* globals vertx: false */
 
-(function(_osjs, _path, _fs, Router, SockJSHandler, StaticHandler, CookieHandler) {
+(function(_osjs, _ebus, _path, _fs, Router, SockJSHandler, StaticHandler, CookieHandler) {
   'use strict';
 
   var instance;
+
+  var System = Java.type("java.lang.System");
+  var BodyHandler = require("vertx-web-js/body_handler");
+  var LocalSessionStore = require("vertx-web-js/local_session_store");
+  var SessionHandler = require("vertx-web-js/session_handler");
+  var ShiroAuth = require("vertx-auth-shiro-js/shiro_auth");
+  var UserSessionHandler = require("vertx-web-js/user_session_handler");
+  var RedirectAuthHandler = require("vertx-web-js/redirect_auth_handler");
+  var FormLoginHandler = require("vertx-web-js/form_login_handler");
 
   /////////////////////////////////////////////////////////////////////////////
   // HELPERS
@@ -179,10 +188,29 @@
   function startServer(port) {
 
     var router = Router.router(vertx);
+    var authProvider = ShiroAuth.create(vertx, 'PROPERTIES', {});
+    var options = {
+      "outboundPermitteds" : [{ "setAddressRegex" : "/^OSjs/" }],
+      "inboundPermitteds" :  [{ "setAddressRegex" : "/^OSjs/" }]
+    };
+    router.route("/eventbus/*").handler(SockJSHandler.create(vertx).bridge(options).handle);
+
+
     router.route().handler(CookieHandler.create().handle);
+
+    router.route().handler(BodyHandler.create().setUploadsDirectory("uploads").handle);
+    router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)).handle);
+    router.route().handler(UserSessionHandler.create(authProvider).handle);
+    router.route('/_login').handler(function(c){c.response().sendFile("loginpage.html")});
+    router.route('/loginhandler').handler(FormLoginHandler.create(authProvider).handle);
+    router.route().handler(RedirectAuthHandler.create(authProvider, "/_login").handle);
+
     router.route().handler(function(routingContext) {
 
       var path = routingContext.request().path();
+
+      //path = path.replace('/shiro/','/');
+      //path = path.replace('/shiro','/');
 
       if (path === '/') {
         path += 'index.html';
@@ -200,18 +228,23 @@
       var relPath = path.replace(/^\/(FS|API)\/?/, '');
 
       function handleCall(isVfs) {
+        console.log('handleCall');
 
         routingContext.request().bodyHandler(function(body) {
+
+          console.log('handleCall2');
 
           try {
 
             var args = JSON.parse(body);
 
             //console.log(JSON.stringify(args));
+            console.log('handleCall3');
 
             instance.request(isVfs, relPath, args, function(error, result) {
 
               //console.log('--req resulting---');
+              console.log('handleCall4');
 
               respondJSON({result: result, error: error}, routingContext);
 
@@ -326,6 +359,11 @@
 
     });
 
+    router.route('/logout').handler(function (context) {
+      context.clearUser();
+      context.response().putHeader("location", "/test").setStatusCode(302).end();
+    });
+
     vertx.createHttpServer().requestHandler(router.accept).listen(port);
 
   }
@@ -353,6 +391,7 @@
 
     var port = setup.port || instance.config.port;
     startServer(port);
+    //_ebus.init(instance);
 
     instance.handler.onServerStart(function() {
       if ( instance.config.logging ) {
@@ -383,6 +422,7 @@
 
 })(
   require('./osjs'),
+  require('./ebus'),
   require('./path'),
   vertx.fileSystem(),
   require('vertx-web-js/router'),

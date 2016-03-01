@@ -134,7 +134,8 @@
   DefaultHandler.prototype.getUserName = function(routingContext) {
     if (verboseAuth) { console.log(' ******* getUserName *******'); }
 
-    return routingContext.getCookie('username').getValue();
+    //return routingContext.getCookie('username').getValue();
+    return 'demo'
   };
 
   /**
@@ -610,7 +611,7 @@
    */
   module.exports.init = function(instance) {
 
-    verboseAuth = false;
+    verboseAuth = true;
 
     // Register 'handler' API methods
     var handler;

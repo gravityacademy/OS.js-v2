@@ -33,7 +33,7 @@
 (function() {
   'use strict';
 
-  var verboseAuth = false;
+  var verboseAuth = true;
 
   /////////////////////////////////////////////////////////////////////////////
   // API

@@ -26,6 +26,10 @@ dependencies {
     compile 'io.vertx:vertx-core:3.2.1'
     compile 'io.vertx:vertx-lang-js:3.2.1'
     compile 'io.vertx:vertx-web:3.2.1'
+    compile 'io.vertx:vertx-auth-common:3.2.1'
+    compile 'io.vertx:vertx-auth-shiro:3.2.1'
+    compile 'io.vertx:vertx-auth-jwt:3.2.1'
+    compile 'org.pac4j:pac4j-oauth:1.7.1'
 }
 
 processResources {

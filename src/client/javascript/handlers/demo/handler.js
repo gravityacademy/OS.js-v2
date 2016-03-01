@@ -81,7 +81,7 @@
 
     var self = this;
 
-    OSjs.Core._Handler.prototype.init.call(this, function() {
+    OSjs.Core._Handler.prototype.init.call(this, function() { callback();
       function finished(result) {
         result.userSettings = getSettings();
         self.onLogin(result, function() {
